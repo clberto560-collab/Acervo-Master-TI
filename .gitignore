@@ -16,6 +16,9 @@ __pycache__/
 venv/
 env/
 
+# Jogo DC CORP - save local do jogador (nao vai pro repo)
+04-PROJETOS/dc-corp-jogo/save_dc_corp.json
+
 # Editors / OS
 .vscode/
 .idea/

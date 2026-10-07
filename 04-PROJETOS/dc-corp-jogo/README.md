@@ -30,7 +30,7 @@ Requer apenas **Python 3** (sem dependencias externas). O jogo roda 100% offline
 |-----|--------|-------|---------|
 | 1 | O Primeiro Dia (JOGAVEL) | 1 | VLAN, modos do IOS, salvar config |
 | 2 | Unindo os Andares (JOGAVEL) | 2 | Trunk 802.1Q, VLANs multiplas |
-| 3 | Estradas da DC Corp | 3 | Roteamento estatico, NAT |
+| 3 | Estradas da DC Corp (JOGAVEL) | 3 | Roteamento estatico, NAT/PAT |
 | 4 | O Muro da Empresa | 4 | Firewall/ACL, contadores |
 | 5 | O Carteiro Digital | 5 | DHCP, DNS |
 | 6 | Espionando o Trafego | 6 | Wireshark, nmap |
@@ -44,32 +44,47 @@ Requer apenas **Python 3** (sem dependencias externas). O jogo roda 100% offline
 
 Dentro do jogo, opcao **3** mostra o guia passo a passo de cada missao (quem passa, cenario, objetivo, o que aprende, recompensa e os passos exatos). Tambem da pra acessar por capitulo: `detonado 2`.
 
-## Gameplay atual (Capitulos 1 e 2)
+## Gameplay atual (Capitulos 1, 2 e 3)
 
 Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas proximas missoes):
 
 - `enable` (modo privilegiado)
 - `configure terminal` (modo config)
 - `vlan <n>` / `name <nome>`
-- `interface fa0/24` (modo interface)
+- `interface fa0/24` (modo interface, switch) e `interface fa0/0`/`fa0/1` (roteador)
 - `switchport mode trunk` / `switchport trunk allowed vlan 10,20`
-- `show vlan brief` / `show running-config` / `show interfaces trunk`
+- `ip address <ip> <mascara>` / `no shutdown`
+- `ip route <rede> <mascara> <next-hop>` (rota estatica / default route)
+- `access-list <n> permit <rede> <wildcard>` + `ip nat inside source list <n> interface <if> overload`
+- `show vlan brief` / `show running-config` / `show interfaces trunk` / `show ip route` / `show ip nat translations`
 - `write memory` (salvar)
-- `conectar SW-01` / `SW-02` (trocar equipamento)
+- `conectar <host>` (trocar equipamento) — `show switches` lista os hosts
 - `help` / `dica` / `missao` / `progresso` / `detonado`
+- `ping 8.8.8.8` (prova da missao 3: diagnostica LAN -> rota -> NAT)
 
 **Capitulo 1** (O Primeiro Dia): recriar a VLAN 10 (TI) nos dois switches e salvar.
 **Capitulo 2** (Unindo os Andares): criar a VLAN 20 (RH) nos dois switches, configurar a
 porta `fa0/24` como trunk 802.1Q e liberar **apenas** as VLANs 10 e 20 no trunk.
+**Capitulo 3** (Estradas da DC Corp): configurar o roteador RT-01 — LAN (`fa0/0`,
+192.168.10.1/24), WAN (`fa0/1`, 200.100.50.2/30), rota padrao para o provedor, NAT
+overload (ACL 1 + inside/outside) — e provar com `ping 8.8.8.8` (4/4).
 
-> Regra de ouro ensinada logo ali: trunk aberto (`vlan any any`) vai escoar todas as
-> VLANs pelo cabo — porta aberta pra ladrão. Sempre limitar com
+> Regra de ouro logo no comeco: trunk aberto (`vlan any any`) vai escoar todas as
+> VLANs pelo cabo — porta aberta pra ladrao. Sempre limitar com
 > `switchport trunk allowed vlan`.
+>
+> E no roteador: IP privado chegando na borda sem NAT morre ali. Nenhum IP interno
+> ultrapassa o `inside` sem virar o IP publico no `outside`.
+
+## Save automatico
+
+Seu progresso (XP, cargo, missoes concluidas) fica salvo em `save_dc_corp.json`
+(ignorado pelo git). Feche o jogo e volte depois: o jogo continua de onde parou.
 
 ## Proximos passos (curto prazo)
 
-1. **Save automatico** (seu cargo/XP/missoes concluidas ficam salvos entre sessoes)
-2. **Missao 3 jogavel** (roteamento estatico + NAT com simulacao de roteadores)
+1. **Missao 4 jogavel** (firewall: ordem de regras e contadores)
+2. **Missao 5 jogavel** (DHCP/DNS como servidor)
 3. **Salto para Godot** (versao Android offline com o mesmo conteudo)
 
 ## Teste automatizado

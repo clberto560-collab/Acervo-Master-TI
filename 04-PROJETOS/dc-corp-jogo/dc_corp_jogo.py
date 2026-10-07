@@ -12,6 +12,7 @@ O DETONADO (opcao 3) e o guia passo a passo de cada missao.
 Requires: Python 3 (sem dependencias externas).
 """
 
+import json
 import os
 import sys
 import time
@@ -32,6 +33,8 @@ COR = {
 }
 
 INTERATIVO = sys.stdin.isatty()
+
+ARQ_SAVE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "save_dc_corp.json")
 
 
 def cr(texto, cor):
@@ -92,12 +95,43 @@ def proximo_cargo(xp):
 
 
 class Personagem:
-    def __init__(self):
-        self.nome = "Cleber"
+    def __init__(self, nome="Cleber"):
+        self.nome = nome
         self.xp = 0
         self.acertos = 0
         self.erros = 0
         self.missoes = {}
+
+    def salvar(self):
+        try:
+            dados = {
+                "nome": self.nome,
+                "xp": self.xp,
+                "acertos": self.acertos,
+                "erros": self.erros,
+                "missoes": self.missoes,
+            }
+            with open(ARQ_SAVE, "w", encoding="utf-8") as f:
+                json.dump(dados, f, indent=2, ensure_ascii=False)
+            return True
+        except OSError:
+            return False
+
+    @staticmethod
+    def carregar():
+        if not os.path.exists(ARQ_SAVE):
+            return Personagem()
+        try:
+            with open(ARQ_SAVE, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+            p = Personagem(dados.get("nome", "Cleber"))
+            p.xp = int(dados.get("xp", 0))
+            p.acertos = int(dados.get("acertos", 0))
+            p.erros = int(dados.get("erros", 0))
+            p.missoes = dados.get("missoes", {})
+            return p
+        except (OSError, ValueError, KeyError):
+            return Personagem()
 
     def ganha_xp(self, pontos, motivo=None):
         antes = cargo_atual(self.xp)
@@ -209,19 +243,33 @@ MISSOES = {
         "id": "m3",
         "capitulo": 3,
         "titulo": "Estradas da DC Corp",
-        "estado": 2,
+        "estado": 1,
         "lv": 3,
         "npc": "Sr. Valente (CEO)",
         "ambientacao": "Os andares viram redes separadas. Agora precisa ligar tudo com roteadores.",
         "objetivo": "Configurar roteamento estatico entre redes e NAT para a Internet.",
         "aprender": "Tabela de rotas, rota estatica, default route e NAT/PAT.",
         "recompensa": 600,
+        "cena_intro": [
+            "O Sr. VALENTE chama na sala. Videochamada mentirinha:",
+            '"Rapaz. A DC Corp tem rede interna, mas o povo ainda usa pendrive',
+            '  pra passar relatorio de um andar pro outro. Eu nao pago o Provedor',
+            '  pra isso, nao ta certo isso."',
+            '"Chegou o EQUIPINHO da sorte (um roteador RT-01). Teu trabalho:',
+            '  configurar esse trem (valendo wow) e fazer a rede 192.168.10.0',
+            '  falar com o mundo em 8.8.8.8. Nenhum IP vazando, hein. Traduz isso."',
+        ],
         "guia": [
-            "1) Enderecar as interfaces dos roteadores.",
-            "2) Criar rotas estaticas para as redes vizinhas.",
-            "3) Configurar default route para a borda.",
-            "4) Implementar NAT (overload) para os hosts sairem com IP publico.",
-            "5) Provar com ping entre redes diferentes.",
+            "1) No RT-01:  enable",
+            "2) LAN: configure terminal -> interface fa0/0 -> ip address 192.168.10.1 255.255.255.0 -> no shutdown",
+            "3) WAN/Provedor: interface fa0/1 -> ip address 200.100.50.2 255.255.255.252 -> no shutdown",
+            "4) Saida pro mundo: (config) -> ip route 0.0.0.0 0.0.0.0 200.100.50.1",
+            "5) Marque os lados do NAT: em fa0/0 digite ip nat inside; em fa0/1, ip nat outside",
+            "6) Libere a rede interna: access-list 1 permit 192.168.10.0 0.0.0.255",
+            "7) Traduza tudo: ip nat inside source list 1 interface fa0/1 overload",
+            "8) Salve: end -> write memory",
+            "9) Prove que ta no mundo:  ping 8.8.8.8  (tem que dar 4/4)",
+            "10) Diagnostico se travar:  show ip route  e  show ip nat translations  |  progresso  |  dica",
         ],
     },
     "m4": {
@@ -401,9 +449,10 @@ def norm_if(arg):
 
 
 class Device:
-    def __init__(self, codigo, vlans_iniciais=None, interfaces=None, saved_inicial=False):
+    def __init__(self, codigo, vlans_iniciais=None, interfaces=None, saved_inicial=False, kind="switch"):
         self.codigo = codigo
         self.hostname = codigo
+        self.kind = kind
         self.modo = "user"
         self.ctx_vlan = None
         self.ctx_if = None
@@ -412,6 +461,12 @@ class Device:
         for nome in list(self.interfaces):
             self.interfaces[norm_if(nome)] = self.interfaces.pop(nome)
         self.saved = saved_inicial
+        self.routes = []
+        self.nat_acl_num = None
+        self.nat_acl_permits = []
+        self.nat_source = None
+        self.nat_inside = set()
+        self.nat_outside = set()
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -433,6 +488,26 @@ class Device:
                 info.append((nome, allowed))
         return info
 
+    def if_ip(self, nome):
+        return self.interfaces.get(nome, {}).get("ip")
+
+    def if_up(self, nome):
+        return bool(self.interfaces.get(nome, {}).get("up", True))
+
+    def tem_rota_tunel(self):
+        for dest, mask, next_hop in self.routes:
+            if dest == "0.0.0.0" and mask == "0.0.0.0":
+                return True
+        return False
+
+    def nat_completo(self):
+        if not (self.nat_inside and self.nat_outside and self.nat_source and self.nat_acl_num):
+            return False
+        acl_permite_lan = any(
+            p[0] == "192.168.10.0" and p[1] == "0.0.0.255" for p in self.nat_acl_permits
+        )
+        return acl_permite_lan
+
 
 def checar_missao(mid, d):
     if mid == "m1":
@@ -442,6 +517,13 @@ def checar_missao(mid, d):
         ok_vlan20 = d.vlan_ok(20, "RH")
         ok_trunk = bool(t) and t["mode"] == "trunk" and t["trunk_allowed"] is not None and {10, 20} <= t["trunk_allowed"]
         return ok_vlan20 and ok_trunk and d.saved
+    if mid == "m3":
+        lan = d.interfaces.get("fa0/0")
+        wan = d.interfaces.get("fa0/1")
+        ok_lan = bool(lan) and lan["mode"] == "access" and lan["ip"] == "192.168.10.1/255.255.255.0" and d.if_up("fa0/0") and "fa0/0" in d.nat_inside
+        ok_wan = bool(wan) and wan["ip"] == "200.100.50.2/255.255.255.252" and d.if_up("fa0/1") and "fa0/1" in d.nat_outside
+        ok_rotas = d.tem_rota_tunel()
+        return ok_lan and ok_wan and ok_rotas and d.nat_completo() and d.saved
     return False
 
 
@@ -452,25 +534,35 @@ class TerminalGame:
         self.mid = mid
         self.missao = m
 
-        def base_interface():
-            return {"mode": "access", "access_vlan": 1, "trunk_allowed": None}
+        def base_interface(up=True):
+            return {"mode": "access", "access_vlan": 1, "trunk_allowed": None, "ip": None, "up": up}
 
-        def device_vazio(cod):
+        def device_vazio(cod, kind="switch", up=True):
             return Device(
                 cod,
                 vlans_iniciais={1: "default"},
                 interfaces={
-                    "fa0/1": base_interface(),
-                    "fa0/24": base_interface(),
+                    "fa0/1": base_interface(up),
+                    "fa0/24": base_interface(up),
                 },
+                kind=kind,
             )
 
-        self.devices = {"SW-01": device_vazio("SW-01"), "SW-02": device_vazio("SW-02")}
+        if mid == "m3":
+            r = device_vazio("RT-01", kind="router", up=False)
+            r.interfaces = {
+                "fa0/0": base_interface(up=False),
+                "fa0/1": base_interface(up=False),
+            }
+            self.devices = {"RT-01": r}
+        else:
+            self.devices = {"SW-01": device_vazio("SW-01"), "SW-02": device_vazio("SW-02")}
+
         if mid == "m2":
             for cod, d in self.devices.items():
                 d.vlans = {1: "default", 10: "TI"}
                 d.saved = False
-        self.atual = self.devices["SW-01"]
+        self.atual = self.devices[list(self.devices.keys())[0]]
         self.atual["modo"] = "user"
 
     # ---- infos de apresentacao ----
@@ -499,6 +591,25 @@ class TerminalGame:
                     requisitos.append("trunk ok")
                 else:
                     requisitos.append("trunk: pendente")
+            if self.mid == "m3":
+                lan = d.interfaces.get("fa0/0")
+                wan = d.interfaces.get("fa0/1")
+                if lan and lan["ip"] and lan["up"] and "fa0/0" in d.nat_inside:
+                    requisitos.append("LAN fa0/0 ok (IP+no shutdown+NAT in)")
+                else:
+                    requisitos.append("LAN fa0/0: pendente")
+                if wan and wan["ip"] and wan["up"] and "fa0/1" in d.nat_outside:
+                    requisitos.append("WAN fa0/1 ok (IP+no shutdown+NAT out)")
+                else:
+                    requisitos.append("WAN fa0/1: pendente")
+                if d.tem_rota_tunel():
+                    requisitos.append("default route ok")
+                else:
+                    requisitos.append("default route: pendente")
+                if d.nat_completo():
+                    requisitos.append("NAT ok (ACL + source overload)")
+                else:
+                    requisitos.append("NAT: pendente")
             requisitos.append("salvo" if d.saved else "NAO salvo")
             ok_tudo = checar_missao(self.mid, d)
             marca = cr("OK", "green") if ok_tudo else cr("FALTA", "yellow")
@@ -528,33 +639,71 @@ class TerminalGame:
             if not d.saved:
                 return "Falta salvar: write memory"
             return "Este switch esta pronto. Vai pro outro: conectar SW-02"
+        if self.mid == "m3":
+            if not (d.if_ip("fa0/0") and d.if_up("fa0/0")):
+                return "LAN: interface fa0/0 -> ip address 192.168.10.1 255.255.255.0, depois no shutdown"
+            if not (d.if_ip("fa0/1") and d.if_up("fa0/1")):
+                return "WAN: interface fa0/1 -> ip address 200.100.50.2 255.255.255.252, depois no shutdown"
+            if "fa0/0" not in d.nat_inside or "fa0/1" not in d.nat_outside:
+                return "Marque o NAT: dentro de interface fa0/0 digite ip nat inside; em fa0/1, ip nat outside"
+            if not d.tem_rota_tunel():
+                return "Falta a saida pro mundo: ip route 0.0.0.0 0.0.0.0 200.100.50.1"
+            if not d.nat_completo():
+                return "Falta traduzir: config global -> access-list 1 permit 192.168.10.0 0.0.0.255 e ip nat inside source list 1 interface fa0/1 overload"
+            if not d.saved:
+                return "Falta salvar: write memory"
+            return "Tudo pronto. Confira com: ping 8.8.8.8"
         return "Digite help para ver comandos."
 
     def help_tela(self):
         d = self.atual
+        eh_router = d.kind == "router"
         if d["modo"] == "user":
-            linhas = [
-                cr(f"== COMANDOS DO {d.hostname} ==", "bold"),
-                "  enable                          modo privilegiado",
-                "  show vlan brief / running-config",
-                "  show interfaces trunk / show switches",
-                "  conectar SW-01|SW-02            troca de equipamento",
-                "  missao / progresso / detonado / dica",
-                "  help / sair",
-            ]
+            if eh_router:
+                linhas = [
+                    cr(f"== COMANDOS DO {d.hostname} ==", "bold"),
+                    "  enable                          modo privilegiado",
+                    "  show ip route / interfaces trunk",
+                    "  ping 8.8.8.8                    testa a saida",
+                    "  missao / progresso / detonado / dica",
+                    "  help / sair",
+                ]
+            else:
+                linhas = [
+                    cr(f"== COMANDOS DO {d.hostname} ==", "bold"),
+                    "  enable                          modo privilegiado",
+                    "  show vlan brief / running-config",
+                    "  show interfaces trunk / show switches",
+                    "  conectar SW-01|SW-02            troca de equipamento",
+                    "  missao / progresso / detonado / dica",
+                    "  help / sair",
+                ]
         elif d["modo"] == "priv":
-            linhas = [
-                cr("== MODO PRIVILEGIADO ==", "bold"),
-                "  configure terminal              modo de configuracao",
-                "  show vlan brief / running-config / interfaces trunk",
-                "  write memory                    salva a config",
-                "  exit / end                      navegacao",
-            ]
+            if eh_router:
+                linhas = [
+                    cr("== MODO PRIVILEGIADO (roteador) ==", "bold"),
+                    "  configure terminal              modo de configuracao",
+                    "  show ip route / show ip nat translations",
+                    "  ping 8.8.8.8                    testa o trajeto completo",
+                    "  write memory                    salva a config",
+                    "  exit / end",
+                ]
+            else:
+                linhas = [
+                    cr("== MODO PRIVILEGIADO ==", "bold"),
+                    "  configure terminal              modo de configuracao",
+                    "  show vlan brief / running-config / interfaces trunk",
+                    "  write memory                    salva a config",
+                    "  exit / end                      navegacao",
+                ]
         elif d["modo"] == "conf":
             linhas = [
                 cr("== CONFIGURACAO GLOBAL ==", "bold"),
                 "  vlan <numero>                   cria/entra na VLAN",
                 "  interface fa0/24                entra na interface",
+                "  ip route <rede> <masc> <next-hop>   rota estatica",
+                "  access-list <n> permit <rede> <wildcard>   lista de controle",
+                "  ip nat inside source list <n> interface <if> overload   NAT",
                 "  end / exit",
             ]
         elif d["modo"] == "conf-vlan":
@@ -564,14 +713,23 @@ class TerminalGame:
                 "  exit / end                      sai",
             ]
         else:
-            linhas = [
-                cr(f"== INTERFACE {d.ctx_if} ==", "bold"),
-                "  switchport mode trunk           vira trunk",
-                "  switchport mode access          vira porta comum",
-                "  switchport access vlan <n>      poe a porta na VLAN",
-                "  switchport trunk allowed vlan <a>,<b>   limita VLANs",
-                "  exit / end",
-            ]
+            if eh_router:
+                linhas = [
+                    cr(f"== INTERFACE {d.ctx_if} (roteador) ==", "bold"),
+                    "  ip address <ip> <mascara>      poe o endereco",
+                    "  no shutdown                    sobe a porta",
+                    "  ip nat inside | outside        marca o lado do NAT",
+                    "  exit / end",
+                ]
+            else:
+                linhas = [
+                    cr(f"== INTERFACE {d.ctx_if} ==", "bold"),
+                    "  switchport mode trunk           vira trunk",
+                    "  switchport mode access          vira porta comum",
+                    "  switchport access vlan <n>      poe a porta na VLAN",
+                    "  switchport trunk allowed vlan <a>,<b>   limita VLANs",
+                    "  exit / end",
+                ]
         return "\n".join(linhas)
 
     def comando_desconhecido(self, linha):
@@ -590,6 +748,8 @@ class TerminalGame:
 
     def show_vlan_brief(self):
         d = self.atual
+        if d.kind == "router":
+            return cr("Roteador nao tem VLAN. E dispositivo de nivel 3: use show ip route.", "yellow")
         linhas = ["", "VLAN Name                             Status    Ports",
                   "---- -------------------------------- --------- --------------"]
         for vid, nome in d["vlans"].items():
@@ -613,7 +773,16 @@ class TerminalGame:
         for nome_if in d.ordem_interfaces():
             itf = d["interfaces"][nome_if]
             partes.append("interface " + nome_if)
-            if itf["mode"] == "trunk":
+            if d.kind == "router":
+                partes.append(" no shutdown" if itf["up"] else " shutdown")
+                if itf["ip"]:
+                    ip, masc = itf["ip"].split("/")
+                    partes.append(f" ip address {ip} {masc}")
+                if nome_if in d.nat_inside:
+                    partes.append(" ip nat inside")
+                if nome_if in d.nat_outside:
+                    partes.append(" ip nat outside")
+            elif itf["mode"] == "trunk":
                 partes.append(" switchport mode trunk")
                 if itf["trunk_allowed"] is not None:
                     partes.append(" switchport trunk allowed vlan " +
@@ -622,8 +791,51 @@ class TerminalGame:
                 partes.append(" switchport mode access")
                 partes.append(f" switchport access vlan {itf['access_vlan']}")
             partes.append("!")
+        if d.kind == "router":
+            for dest, masc, next_hop in d.routes:
+                partes.append(f"ip route {dest} {masc} {next_hop}")
+            if d.nat_acl_num is not None:
+                for rede, wildcard in d.nat_acl_permits:
+                    partes.append(f"access-list {d.nat_acl_num} permit {rede} {wildcard}")
+            if d.nat_source:
+                partes.append(f"ip nat inside source list {d.nat_acl_num} interface {d.nat_source['interface']} overload")
         partes.append("end")
         return "\n".join(partes)
+
+    def show_ip_route(self):
+        d = self.atual
+        if d.kind != "router":
+            return cr("Switch L2 nao roteia. Use show vlan brief.", "yellow")
+        if not d.routes and not any(d.if_ip(n) for n in d.interfaces):
+            return "Tabela de rotas vazia. (Configure as interfaces e as rotas!)"
+        linhas = ["", "Codes: C - connected, S - static"]
+        for nome_if in d.ordem_interfaces():
+            ip = d.if_ip(nome_if)
+            if ip:
+                end_ip, masc = ip.split("/")
+                octetos = [int(o) for o in end_ip.split(".")]
+                if octetos[2] in (10, 20, 30):
+                    rede = f"{octetos[0]}.{octetos[1]}.{octetos[2]}.0"
+                    linhas.append(f"C  {rede} is directly connected, {nome_if}")
+        for dest, masc, next_hop in d.routes:
+            linhas.append(f"S  {dest}/0.0.0.0 [1/0] via {next_hop}" if dest == "0.0.0.0" else f"S  {dest}/16 [1/0] via {next_hop}")
+        linhas.append("")
+        return "\n".join(linhas)
+
+    def show_nat(self):
+        d = self.atual
+        if d.kind != "router":
+            return cr("NAT e recurso de roteador/borda.", "yellow")
+        if d.if_ip("fa0/1") and d.nat_source:
+            wan_ip = d.if_ip("fa0/1").split("/")[0]
+            return "\n".join([
+                "",
+                "Pro Inside Global      Inside Local       Outside Global    Outside Local",
+                "icmp 200.100.50.2:1024 192.168.10.25:1024 8.8.8.8:0          8.8.8.8:0",
+                f"(amostra: host 192.168.10.25 saiu como {wan_ip})",
+                "",
+            ])
+        return cr("Nenhuma traducao NAT configurada/ativa ainda.", "yellow")
 
     def show_trunk(self):
         d = self.atual
@@ -706,7 +918,7 @@ class TerminalGame:
             return
         nome = norm_if(arg)
         if nome not in d["interfaces"]:
-            d["interfaces"][nome] = {"mode": "access", "access_vlan": 1, "trunk_allowed": None}
+            d["interfaces"][nome] = {"mode": "access", "access_vlan": 1, "trunk_allowed": None, "ip": None, "up": False if d.kind == "router" else True}
             print(cr(f"(criando interface {nome} no simulador)", "dim"))
         d["ctx_if"] = nome
         d["modo"] = "conf-if"
@@ -714,6 +926,9 @@ class TerminalGame:
 
     def ac_switchport(self, arg_resto):
         d = self.atual
+        if d.kind == "router":
+            self.comando_errado("% switchport nao existe em roteador. Use ip address / ip nat.")
+            return
         if d["modo"] != "conf-if":
             self.comando_errado("% switchport is only allowed inside an interface.")
             return
@@ -775,6 +990,130 @@ class TerminalGame:
         print(cr("[OK]", "green"))
         self.jogo.ganha_xp(25, f"config salva no {d.hostname}")
 
+    def ac_no(self, arg_resto):
+        d = self.atual
+        if d["modo"] != "conf-if":
+            self.comando_errado("% no is only allowed inside an interface.")
+            return
+        if arg_resto.lower().startswith("shutdown"):
+            d["interfaces"][d["ctx_if"]]["up"] = True
+            self.jogo.ganha_xp(10, f"{d['ctx_if']} no shutdown")
+            print(cr(f"Interface {d['ctx_if']} UP.", "green"))
+        else:
+            self.comando_errado("% Use: no shutdown")
+
+    def ac_ip(self, partes):
+        d = self.atual
+        if not partes:
+            self.comando_errado("% Incomplete command.")
+            return
+        cmd = [p.lower() for p in partes]
+        if d["modo"] == "conf-if":
+            if cmd[0] == "address":
+                if len(cmd) < 2:
+                    self.comando_errado("% Use: ip address <ip> <mascara>")
+                    return
+                masc = cmd[2] if len(cmd) >= 3 else "255.255.255.0"
+                d["interfaces"][d["ctx_if"]]["ip"] = f"{cmd[1]}/{masc}"
+                self.jogo.ganha_xp(20, f"{d['ctx_if']} ip {cmd[1]}")
+            elif cmd[0] == "nat":
+                if len(cmd) < 2:
+                    self.comando_errado("% Use: ip nat inside | ip nat outside")
+                    return
+                if cmd[1] == "inside":
+                    d.nat_inside.add(d["ctx_if"])
+                    self.jogo.ganha_xp(10, f"{d['ctx_if']} NAT inside")
+                    print(cr(f"Interface {d['ctx_if']} marcada como lado interno (inside).", "yellow"))
+                elif cmd[1] == "outside":
+                    d.nat_outside.add(d["ctx_if"])
+                    self.jogo.ganha_xp(10, f"{d['ctx_if']} NAT outside")
+                    print(cr(f"Interface {d['ctx_if']} marcada como lado externo (outside).", "yellow"))
+                else:
+                    self.comando_errado("% Use: ip nat inside | ip nat outside")
+            else:
+                self.comando_errado("% Em interface use: ip address | ip nat inside | ip nat outside")
+            return
+        if d["modo"] == "conf":
+            if cmd[0] == "route":
+                if len(cmd) < 4:
+                    self.comando_errado("% Use: ip route <rede> <mascara> <next-hop>")
+                    return
+                d.routes.append((cmd[1], cmd[2], cmd[3]))
+                self.jogo.ganha_xp(30, "rota estatica criada")
+                if cmd[1] == "0.0.0.0":
+                    print(cr("Default route para o mundo configurada.", "green"))
+            elif cmd[0] == "nat" and cmd[1:4] == ["inside", "source", "list"]:
+                try:
+                    num = int(cmd[4])
+                except (ValueError, IndexError):
+                    self.comando_errado("% Numero de access-list invalido.")
+                    return
+                if len(cmd) == 8 and cmd[5] == "interface" and cmd[7] == "overload":
+                    d.nat_acl_num = num
+                    d.nat_source = {"acl": num, "interface": cmd[6]}
+                    self.jogo.ganha_xp(40, "NAT overload configurado")
+                    print(cr("NAT inside source ... overload aplicado.", "green"))
+                else:
+                    self.comando_errado("% Use: ip nat inside source list <n> interface <if> overload")
+            else:
+                self.comando_errado("% Em config global use: ip route | ip nat inside source list")
+            return
+        self.comando_errado("% ip command not allowed in this mode.")
+
+    def ac_access_list(self, arg_resto):
+        d = self.atual
+        if d["modo"] != "conf":
+            self.comando_errado("% access-list is only allowed in configuration mode.")
+            return
+        partes = arg_resto.split()
+        if len(partes) < 4 or partes[1].lower() != "permit":
+            self.comando_errado("% Use: access-list <n> permit <rede> <wildcard>")
+            return
+        try:
+            num = int(partes[0])
+            rede = partes[2]
+            wildcard = partes[3]
+        except ValueError:
+            self.comando_errado("% Valor invalido.")
+            return
+        d.nat_acl_num = num
+        d.nat_acl_permits.append((rede, wildcard))
+        self.jogo.ganha_xp(15, f"ACL {num} permit {rede} {wildcard}")
+        print(cr(f"Lista de acesso {num} criada: rede {rede} liberada.", "yellow"))
+
+    def ac_ping(self):
+        d = self.atual
+        if d.kind != "router":
+            self.comando_errado("% Switch L2 nao pinga. Use ping em um roteador.")
+            return
+        print()
+        print("PING 8.8.8.8 (8.8.8.8) from um host da LAN 192.168.10.x: 32 data bytes")
+        if not (d.if_ip("fa0/0") and d.if_up("fa0/0")):
+            print(cr("Reply from 192.168.10.1: Destination host unreachable.", "red"))
+            print(cr("LAN sem ip/up na fa0/0: nenhum host conseguiu nem sair do predio.", "yellow"))
+            return
+        if not d.tem_rota_tunel():
+            print("Request timed out. 0/4 receptions")
+            print(cr("O pacote subiu do host, chegou no roteador e... nao tinha pra onde ir: falta a rota pro mundo.", "yellow"))
+            return
+        if not d.nat_completo():
+            print("Request timed out. 0/4 receptions")
+            print(cr("Pacote com IP privado 192.168.10.25 chegou na borda e morreu: NAT nao traduziu.",
+                     "yellow"))
+            print(cr("Confira a ACL (permit 192.168.10.0/0.0.0.255), os lados inside/outside e o overload.", "dim"))
+            return
+        if not d.if_ip("fa0/1"):
+            print("Request timed out. 0/4 receptions")
+            return
+        print(cr("Reply from 8.8.8.8: bytes=32 time=1ms TTL=57", "green"))
+        print(cr("Reply from 8.8.8.8: bytes=32 time=1ms TTL=57", "green"))
+        print(cr("Reply from 8.8.8.8: bytes=32 time=1ms TTL=57", "green"))
+        print(cr("Reply from 8.8.8.8: bytes=32 time=1ms TTL=57", "green"))
+        print(cr("Round-trip min/avg/max = 1/1/2 ms", "green"))
+        print(cr("4/4. O host da DC Corp ta NA INTERNET. O Valente vai chorar de orgulho.",
+                 "green"))
+        self.jogo.ganha_xp(20, "ping de sucesso")
+
     def ir_para(self, cod):
         if cod in self.devices:
             d = self.devices[cod]
@@ -785,7 +1124,7 @@ class TerminalGame:
             print(cr(f"Conectando a {cod} via SSH...", "bold"))
             print(cr("Autenticacao bem-sucedida.", "green"))
         else:
-            self.comando_errado("% Host desconhecido. Use: conectar SW-01 ou SW-02")
+            self.comando_errado("% Host desconhecido. Disponiveis: " + ", ".join(self.devices))
 
     # ---- loop ----
 
@@ -793,7 +1132,7 @@ class TerminalGame:
         print()
         motd([(linha, "magenta") for linha in self.missao["cena_intro"]])
         print()
-        print(cr("Voce esta no terminal do SW-01. Digite help para os comandos.", "green"))
+        print(cr(f"Voce esta no terminal do {self.atual.hostname}. Digite help para os comandos.", "green"))
         print()
         while True:
             linha = ler(self.prompt() + " ")
@@ -829,6 +1168,14 @@ class TerminalGame:
                     print(self.show_trunk())
                 elif arg == "switches":
                     print(self.ver_switches())
+                elif arg == "ip":
+                    sub = partes[2:3]
+                    if sub == ["route"]:
+                        print(self.show_ip_route())
+                    elif sub == ["nat"]:
+                        print(self.show_nat())
+                    else:
+                        self.comando_desconhecido(linha)
                 else:
                     self.comando_desconhecido(linha)
             elif cmd == "enable":
@@ -857,6 +1204,14 @@ class TerminalGame:
                     self.comando_errado("% Incomplete command. (write memory)")
             elif cmd in ("wr", "save"):
                 self.ac_write()
+            elif cmd == "no":
+                self.ac_no(arg_resto)
+            elif cmd == "ip":
+                self.ac_ip(partes[1:])
+            elif cmd == "access-list":
+                self.ac_access_list(arg_resto)
+            elif cmd == "ping":
+                self.ac_ping()
             elif cmd == "end":
                 d = self.atual
                 d["ctx_vlan"] = None
@@ -886,7 +1241,7 @@ class TerminalGame:
                 return
 
     def ver_switches(self):
-        linhas = [cr("Switches ligados:", "bold")]
+        linhas = [cr("Equipamentos da missao:", "bold")]
         for cod, d in self.devices.items():
             ok = checar_missao(self.mid, d)
             linhas.append(f"  {cr(cod, 'green')}  {cr('PRONTO', 'green') if ok else cr('FALTA', 'yellow')}")
@@ -912,8 +1267,15 @@ class TerminalGame:
             print(cr('Janaina: "Trunk configurado, VLAN 20 do RH no ar, e liberdade com', "magenta"))
             print(cr('  limite. Assim que se faz. O Valente quer te ver."', "magenta"))
             print(cr('  (Ele nunca quer ver ninguem. Cuidado.)', "dim"))
+        elif self.mid == "m3":
+            print(cr('Valente: "O mundo. A DC CORP TAXA NA INTERNET! O povo ainda', "magenta"))
+            print(cr('  vai chorar de alegria. E olha, ROUTING michel. Aguenta esse"', "magenta"))
+            print(cr('  emprego, garoto, que daqui a pouco voce me cobra."', "magenta"))
+            print(cr('  (A Janaina deu o polegar por tras da porta.)', "dim"))
         print()
         print(cr("Voltando a central de operacoes...", "dim"))
+        if self.jogo.salvar():
+            print(cr("Progresso salvo automaticamente em save_dc_corp.json.", "green"))
 
 
 # ---------------------------------------------------------------------------
@@ -999,15 +1361,20 @@ def central(jogo):
             print(jogo.status_perfil())
         else:
             print(cr("Comando nao reconhecido. Use os numeros 1 a 5.", "red"))
+    if jogo.salvar():
+        print(cr("Progresso salvo em save_dc_corp.json.", "green"))
 
 
 def main():
-    jogo = Personagem()
+    jogo = Personagem.carregar()
+    if jogo.missoes:
+        print(cr(f"(save encontrado: {jogo.xp} XP, {len(jogo.missoes)} missoes concluidas)", "dim"))
     try:
         central(jogo)
     except KeyboardInterrupt:
         print()
         print(cr("Conexao encerrada. O Valente ja vai ouvir sobre isso.", "dim"))
+        jogo.salvar()
     print()
     print(cr("Sessao encerrada. A DC Corp agradece. Volte sempre, estagiario.", "dim"))
 
