@@ -1,0 +1,15 @@
+1
+enable
+configure terminal
+vlan 10
+name TI
+end
+write memory
+conectar SW-02
+enable
+configure terminal
+vlan 10
+name TI
+end
+write memory
+2
