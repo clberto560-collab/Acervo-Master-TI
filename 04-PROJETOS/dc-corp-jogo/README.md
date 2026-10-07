@@ -29,7 +29,7 @@ Requer apenas **Python 3** (sem dependencias externas). O jogo roda 100% offline
 | Cap | Missao | Nivel | Aprende |
 |-----|--------|-------|---------|
 | 1 | O Primeiro Dia (JOGAVEL) | 1 | VLAN, modos do IOS, salvar config |
-| 2 | Unindo os Andares | 2 | Trunk 802.1Q, VLANs multiplas |
+| 2 | Unindo os Andares (JOGAVEL) | 2 | Trunk 802.1Q, VLANs multiplas |
 | 3 | Estradas da DC Corp | 3 | Roteamento estatico, NAT |
 | 4 | O Muro da Empresa | 4 | Firewall/ACL, contadores |
 | 5 | O Carteiro Digital | 5 | DHCP, DNS |
@@ -44,22 +44,32 @@ Requer apenas **Python 3** (sem dependencias externas). O jogo roda 100% offline
 
 Dentro do jogo, opcao **3** mostra o guia passo a passo de cada missao (quem passa, cenario, objetivo, o que aprende, recompensa e os passos exatos). Tambem da pra acessar por capitulo: `detonado 2`.
 
-## Gameplay atual (Capitulo 1)
+## Gameplay atual (Capitulos 1 e 2)
 
-Terminal Cisco simulado com comandos reais:
+Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas proximas missoes):
 
 - `enable` (modo privilegiado)
 - `configure terminal` (modo config)
-- `vlan 10` / `name TI`
-- `show vlan brief` / `show running-config`
+- `vlan <n>` / `name <nome>`
+- `interface fa0/24` (modo interface)
+- `switchport mode trunk` / `switchport trunk allowed vlan 10,20`
+- `show vlan brief` / `show running-config` / `show interfaces trunk`
 - `write memory` (salvar)
 - `conectar SW-01` / `SW-02` (trocar equipamento)
-- `help` / `dica` / `detonado`
+- `help` / `dica` / `missao` / `progresso` / `detonado`
+
+**Capitulo 1** (O Primeiro Dia): recriar a VLAN 10 (TI) nos dois switches e salvar.
+**Capitulo 2** (Unindo os Andares): criar a VLAN 20 (RH) nos dois switches, configurar a
+porta `fa0/24` como trunk 802.1Q e liberar **apenas** as VLANs 10 e 20 no trunk.
+
+> Regra de ouro ensinada logo ali: trunk aberto (`vlan any any`) vai escoar todas as
+> VLANs pelo cabo — porta aberta pra ladrão. Sempre limitar com
+> `switchport trunk allowed vlan`.
 
 ## Proximos passos (curto prazo)
 
-1. **Missao 2 jogavel** (trunk 802.1Q entre SW-01/SW-02 com teste de comunicacao)
-2. **Persistencia de save** (seu cargo/XP ficam salvos entre sessoes)
+1. **Save automatico** (seu cargo/XP/missoes concluidas ficam salvos entre sessoes)
+2. **Missao 3 jogavel** (roteamento estatico + NAT com simulacao de roteadores)
 3. **Salto para Godot** (versao Android offline com o mesmo conteudo)
 
 ## Teste automatizado
