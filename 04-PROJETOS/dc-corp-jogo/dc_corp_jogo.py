@@ -276,19 +276,35 @@ MISSOES = {
         "id": "m4",
         "capitulo": 4,
         "titulo": "O Muro da Empresa",
-        "estado": 2,
+        "estado": 1,
         "lv": 4,
         "npc": "Supervisora Janaina Lopes",
         "ambientacao": "O financeiro descobriu que o RH acessa os servidores da diretoria. Briga feia.",
         "objetivo": "Criar regras de firewall: bloquear a VLAN do RH de acessar a rede da diretoria.",
         "aprender": "ACL (Cisco) e regras de firewall, ordem das regras e contadores.",
         "recompensa": 800,
+        "cena_intro": [
+            "Supervisora JANAINA fecha a cara:",
+            '"Rapaz, coisa feia. O Financeiro pegou o estagiario do RH',
+            '  bisbilhotando os servidores da Diretoria (rede 192.168.10.0).',
+            '  Briga que tu nao quer ver."',
+            '"O roteador RT-01 ja ta de pe: de um lado o RH (fa0/1,',
+            '  192.168.20.0), do outro a Diretoria (fa0/0, 192.168.10.0).',
+            '  Teu role: escrever uma ACL que TRANCA o RH na Diretoria, mas',
+            '  deixa o TI navegar normal. E sem esquecer a ordem das regras."',
+        ],
         "guia": [
-            "1) Mapear as redes envolvidas (RH, TI, Diretoria).",
-            "2) Escrever ACL que nega RH -> Diretoria.",
-            "3) Aplicar a ACL na interface correta (entrada ou saida).",
-            "4) Permitir o resto do trafego depois da negacao.",
-            "5) Verificar contadores com show access-lists.",
+            "1) No RT-01:  enable",
+            "2) Crie a lista de acesso 100:  configure terminal",
+            "3) REGRAS NA ORDEM CERTA (a 1a que bate vale):",
+            "   a) Barre o RH na Diretoria:  access-list 100 deny ip 192.168.20.0 0.0.0.255 192.168.10.0 0.0.0.255",
+            "   b) Deixe TODO o resto passar:  access-list 100 permit ip any any",
+            "4) Aplique na porta que recebe o RH:  interface fa0/1 -> ip access-group 100 in",
+            "5) Salve:  end -> write memory",
+            "6) Prove: rode  simular trafego  (RH -> Diretoria tem que ser BLOQUEADO e",
+            "   TI -> Internet tem que ser LIBERADO)",
+            "7) Confira os contadores:  show access-lists",
+            "8) Testes:  progresso  (todos os requisitos) e  dica  se travar.",
         ],
     },
     "m5": {
@@ -467,6 +483,8 @@ class Device:
         self.nat_source = None
         self.nat_inside = set()
         self.nat_outside = set()
+        self.acl_listas = {}
+        self.firewall_tested = False
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -487,6 +505,30 @@ class Device:
                 allowed = itf["trunk_allowed"]
                 info.append((nome, allowed))
         return info
+
+    def acl_aplicada(self, nome_if, direcao):
+        return self.interfaces.get(nome_if, {}).get(f"acl_{direcao}")
+
+    def acl_deny_rh_diretoria(self):
+        for num, regras in self.acl_listas.items():
+            idx_deny = -1
+            idx_permit = -1
+            for i, r in enumerate(regras):
+                if (r["acao"] == "deny" and r["src"] == ("192.168.20.0", "0.0.0.255")
+                        and r["dst"] == ("192.168.10.0", "0.0.0.255")):
+                    idx_deny = i
+                    break
+            for i, r in enumerate(regras):
+                if r["acao"] == "permit" and r["dst"] == ("any", "any") and i > idx_deny:
+                    idx_permit = i
+                    break
+            if idx_deny != -1 and idx_permit != -1:
+                return num
+        return None
+
+    def firewall_ok(self):
+        num = self.acl_deny_rh_diretoria()
+        return num is not None and self.acl_aplicada("fa0/1", "in") == num
 
     def if_ip(self, nome):
         return self.interfaces.get(nome, {}).get("ip")
@@ -524,6 +566,8 @@ def checar_missao(mid, d):
         ok_wan = bool(wan) and wan["ip"] == "200.100.50.2/255.255.255.252" and d.if_up("fa0/1") and "fa0/1" in d.nat_outside
         ok_rotas = d.tem_rota_tunel()
         return ok_lan and ok_wan and ok_rotas and d.nat_completo() and d.saved
+    if mid == "m4":
+        return d.firewall_ok() and d.firewall_tested and d.saved
     return False
 
 
@@ -535,7 +579,8 @@ class TerminalGame:
         self.missao = m
 
         def base_interface(up=True):
-            return {"mode": "access", "access_vlan": 1, "trunk_allowed": None, "ip": None, "up": up}
+            return {"mode": "access", "access_vlan": 1, "trunk_allowed": None, "ip": None, "up": up,
+                    "acl_in": None, "acl_out": None}
 
         def device_vazio(cod, kind="switch", up=True):
             return Device(
@@ -554,6 +599,15 @@ class TerminalGame:
                 "fa0/0": base_interface(up=False),
                 "fa0/1": base_interface(up=False),
             }
+            self.devices = {"RT-01": r}
+        elif mid == "m4":
+            r = device_vazio("RT-01", kind="router", up=True)
+            r.interfaces = {
+                "fa0/0": base_interface(up=True),  # Diretoria/TI  192.168.10.0/24
+                "fa0/1": base_interface(up=True),  # RH            192.168.20.0/24
+            }
+            r.interfaces["fa0/0"]["ip"] = "192.168.10.1/255.255.255.0"
+            r.interfaces["fa0/1"]["ip"] = "192.168.20.1/255.255.255.0"
             self.devices = {"RT-01": r}
         else:
             self.devices = {"SW-01": device_vazio("SW-01"), "SW-02": device_vazio("SW-02")}
@@ -610,6 +664,20 @@ class TerminalGame:
                     requisitos.append("NAT ok (ACL + source overload)")
                 else:
                     requisitos.append("NAT: pendente")
+            if self.mid == "m4":
+                num = d.acl_deny_rh_diretoria()
+                if num is not None:
+                    requisitos.append(f"ACL {num}: nega RH->Diretoria 1o")
+                else:
+                    requisitos.append("ACL negando RH->Diretoria: pendente")
+                if d.acl_aplicada("fa0/1", "in"):
+                    requisitos.append("aplicada in fa0/1")
+                else:
+                    requisitos.append("apl. in fa0/1: pendente")
+                if d.firewall_tested:
+                    requisitos.append("teste de trafego ok")
+                else:
+                    requisitos.append("teste de trafego: nao rodou")
             requisitos.append("salvo" if d.saved else "NAO salvo")
             ok_tudo = checar_missao(self.mid, d)
             marca = cr("OK", "green") if ok_tudo else cr("FALTA", "yellow")
@@ -653,6 +721,16 @@ class TerminalGame:
             if not d.saved:
                 return "Falta salvar: write memory"
             return "Tudo pronto. Confira com: ping 8.8.8.8"
+        if self.mid == "m4":
+            if d.acl_deny_rh_diretoria() is None:
+                return "Crie a regra que BARRA o RH: access-list 100 deny ip 192.168.20.0 0.0.0.255 192.168.10.0 0.0.0.255"
+            if not d.acl_aplicada("fa0/1", "in"):
+                return "Aplique a ACL na porta de entrada do RH: interface fa0/1 -> ip access-group 100 in"
+            if not d.firewall_tested:
+                return "Falta conferir: rode  simular trafego  e veja o contador no show access-lists"
+            if not d.saved:
+                return "Falta salvar: write memory"
+            return "Muro de pe. Olha o contador no show access-lists."
         return "Digite help para ver comandos."
 
     def help_tela(self):
@@ -683,8 +761,9 @@ class TerminalGame:
                 linhas = [
                     cr("== MODO PRIVILEGIADO (roteador) ==", "bold"),
                     "  configure terminal              modo de configuracao",
-                    "  show ip route / show ip nat translations",
+                    "  show ip route / show ip nat translations / show access-lists",
                     "  ping 8.8.8.8                    testa o trajeto completo",
+                    "  simular trafego                 testa o firewall (ACL)",
                     "  write memory                    salva a config",
                     "  exit / end",
                 ]
@@ -702,7 +781,7 @@ class TerminalGame:
                 "  vlan <numero>                   cria/entra na VLAN",
                 "  interface fa0/24                entra na interface",
                 "  ip route <rede> <masc> <next-hop>   rota estatica",
-                "  access-list <n> permit <rede> <wildcard>   lista de controle",
+                "  access-list <n> permit|deny <src> <wild> [<dst> <wild>]  ACL",
                 "  ip nat inside source list <n> interface <if> overload   NAT",
                 "  end / exit",
             ]
@@ -719,6 +798,7 @@ class TerminalGame:
                     "  ip address <ip> <mascara>      poe o endereco",
                     "  no shutdown                    sobe a porta",
                     "  ip nat inside | outside        marca o lado do NAT",
+                    "  ip access-group <n> in|out     aplica a ACL",
                     "  exit / end",
                 ]
             else:
@@ -782,6 +862,10 @@ class TerminalGame:
                     partes.append(" ip nat inside")
                 if nome_if in d.nat_outside:
                     partes.append(" ip nat outside")
+                if itf.get("acl_in"):
+                    partes.append(f" ip access-group {itf['acl_in']} in")
+                if itf.get("acl_out"):
+                    partes.append(f" ip access-group {itf['acl_out']} out")
             elif itf["mode"] == "trunk":
                 partes.append(" switchport mode trunk")
                 if itf["trunk_allowed"] is not None:
@@ -794,6 +878,12 @@ class TerminalGame:
         if d.kind == "router":
             for dest, masc, next_hop in d.routes:
                 partes.append(f"ip route {dest} {masc} {next_hop}")
+            for num in sorted(d.acl_listas):
+                for regra in d.acl_listas[num]:
+                    if regra["proto"]:
+                        partes.append(f"access-list {num} {regra['acao']} {regra['proto']} {regra['src'][0]} {regra['src'][1]} {regra['dst'][0]} {regra['dst'][1]}")
+                    else:
+                        partes.append(f"access-list {num} {regra['acao']} {regra['src'][0]} {regra['src'][1]}")
             if d.nat_acl_num is not None:
                 for rede, wildcard in d.nat_acl_permits:
                     partes.append(f"access-list {d.nat_acl_num} permit {rede} {wildcard}")
@@ -853,6 +943,26 @@ class TerminalGame:
                 linhas.append(f"{nome_if:<12} todas (perigoso!)")
             else:
                 linhas.append(f"{nome_if:<12} " + ",".join(str(v) for v in sorted(allowed)))
+        linhas.append("")
+        return "\n".join(linhas)
+
+    def show_access_lists(self):
+        d = self.atual
+        if not d.acl_listas:
+            return cr("Nenhuma access-list configurada ainda.", "yellow")
+        linhas = ["", "Access-lists configuradas:"]
+        for num in sorted(d.acl_listas):
+            linhas.append(f"IP access list {num}")
+            for i, regra in enumerate(d.acl_listas[num]):
+                if regra["proto"]:
+                    partes = f"{regra['acao'].upper():<7} {regra['proto']:<3} {regra['src'][0].upper():<15} {regra['src'][1]:<11} {regra['dst'][0].upper():<15} {regra['dst'][1]}"
+                else:
+                    partes = f"{regra['acao'].upper():<7} {regra['src'][0].upper():<15} {regra['src'][1]:<11}"
+                base = f"    {i+1} {partes}"
+                if regra["contador"]:
+                    linhas.append(f"{base}   (match: {regra['contador']})")
+                else:
+                    linhas.append(base)
         linhas.append("")
         return "\n".join(linhas)
 
@@ -918,7 +1028,8 @@ class TerminalGame:
             return
         nome = norm_if(arg)
         if nome not in d["interfaces"]:
-            d["interfaces"][nome] = {"mode": "access", "access_vlan": 1, "trunk_allowed": None, "ip": None, "up": False if d.kind == "router" else True}
+            d["interfaces"][nome] = {"mode": "access", "access_vlan": 1, "trunk_allowed": None, "ip": None, "up": False if d.kind == "router" else True,
+                                     "acl_in": None, "acl_out": None}
             print(cr(f"(criando interface {nome} no simulador)", "dim"))
         d["ctx_if"] = nome
         d["modo"] = "conf-if"
@@ -1016,6 +1127,18 @@ class TerminalGame:
                 masc = cmd[2] if len(cmd) >= 3 else "255.255.255.0"
                 d["interfaces"][d["ctx_if"]]["ip"] = f"{cmd[1]}/{masc}"
                 self.jogo.ganha_xp(20, f"{d['ctx_if']} ip {cmd[1]}")
+            elif cmd[0] == "access-group":
+                if len(cmd) < 3 or cmd[2] not in ("in", "out"):
+                    self.comando_errado("% Use: ip access-group <numero> in|out")
+                    return
+                try:
+                    num = int(cmd[1])
+                except ValueError:
+                    self.comando_errado("% Numero de ACL invalido.")
+                    return
+                d["interfaces"][d["ctx_if"]][f"acl_{cmd[2]}"] = num
+                self.jogo.ganha_xp(25, f"ACL {num} aplicada em {d['ctx_if']} {cmd[2]}")
+                print(cr(f"ACL {num} aplicada em {d['ctx_if']} (entrada {cmd[2]}).", "green"))
             elif cmd[0] == "nat":
                 if len(cmd) < 2:
                     self.comando_errado("% Use: ip nat inside | ip nat outside")
@@ -1066,20 +1189,108 @@ class TerminalGame:
             self.comando_errado("% access-list is only allowed in configuration mode.")
             return
         partes = arg_resto.split()
-        if len(partes) < 4 or partes[1].lower() != "permit":
-            self.comando_errado("% Use: access-list <n> permit <rede> <wildcard>")
+        if len(partes) < 4 or partes[1].lower() not in ("permit", "deny"):
+            self.comando_errado("% Use: access-list <n> permit|deny ip <src> <wild> <dst> <wild>  (ou  <src> <wild> p/ permit simples)")
             return
         try:
             num = int(partes[0])
-            rede = partes[2]
-            wildcard = partes[3]
         except ValueError:
             self.comando_errado("% Valor invalido.")
             return
-        d.nat_acl_num = num
-        d.nat_acl_permits.append((rede, wildcard))
-        self.jogo.ganha_xp(15, f"ACL {num} permit {rede} {wildcard}")
-        print(cr(f"Lista de acesso {num} criada: rede {rede} liberada.", "yellow"))
+        acao = partes[1].lower()
+        p = [x.lower() for x in partes]
+        proto = None
+        if p[2] in ("ip", "tcp", "udp", "icmp"):
+            proto = p[2]
+            if len(p) >= 7:
+                src = (p[3], p[4])
+                dst = (p[5], p[6])
+            elif len(p) == 5 and p[3] == "any" and p[4] == "any":
+                src = ("any", "any")
+                dst = ("any", "any")
+            else:
+                self.comando_errado("% Use: access-list <n> deny ip <src> <wildcard> <dst> <wildcard>")
+                return
+        else:
+            src = (p[2], p[3])
+            dst = ("any", "any")
+        regra = {"acao": acao, "proto": proto, "src": src, "dst": dst, "contador": 0}
+        d.acl_listas.setdefault(num, []).append(regra)
+        if acao == "permit":
+            d.nat_acl_num = num
+            if src[0] != "any":
+                d.nat_acl_permits.append(src)
+        self.jogo.ganha_xp(15, f"ACL {num} {acao} {src[0]} -> {dst[0]}")
+        print(cr(f"Lista de acesso {num}: regra {acao} adicionada (regras na lista: {len(d.acl_listas[num])}).", "yellow"))
+
+    def verificar_trafego_simples(self, regra, src_ip, dst_ip):
+        def bate(par, ip):
+            rede, wild = par
+            if rede == "any":
+                return True
+            quartos = [int(x) for x in rede.split(".")]
+            masc = [255 - int(w) for w in wild.split(".")] if wild != "0.0.0.0" else [255] * 4
+            alvo = [int(x) for x in ip.split(".")]
+            return all((q & m) == (t & m) for q, m, t in zip(quartos, masc, alvo))
+        if regra["acao"] == "permit":
+            return bate(regra["src"], src_ip) and bate(regra["dst"], dst_ip)
+        if regra["acao"] == "deny":
+            return None if (bate(regra["src"], src_ip) and bate(regra["dst"], dst_ip)) else False
+        return False
+
+    def ac_simular(self, resto):
+        d = self.atual
+        if d["modo"] != "priv":
+            self.comando_errado("% simular is only allowed in privileged mode.")
+            return
+        num_acl = d.acl_aplicada("fa0/1", "in")
+        regras = d.acl_listas.get(num_acl, [])
+        num_ok = num_acl == d.acl_deny_rh_diretoria()
+        print()
+        print(cr("== SIMULANDO TRAFEGO ==", "bold"))
+        ok_rh = True
+        ok_ti = True
+
+        origem, destino = "192.168.20.15", "192.168.10.30"
+        bloqueado = False
+        for regra in regras:
+            if regra["acao"] == "deny" and self.verificar_trafego_simples(regra, origem, destino) is None:
+                bloqueado = True
+                regra["contador"] += 1
+                print(cr(f"  RH -> Diretoria   : BLOQUEADO  (deny bateu, contador {regra['contador']})", "green"))
+                break
+            if regra["acao"] == "permit" and self.verificar_trafego_simples(regra, origem, destino):
+                break
+        if not bloqueado:
+            ok_rh = False
+            if not regras:
+                print(cr("  RH -> Diretoria   : LIBERADO! Nenhuma ACL aplicada na porta.", "red"))
+            else:
+                print(cr("  RH -> Diretoria   : LIBERADO! A regra deny nao veio antes.", "red"))
+
+        origem, destino = "192.168.10.5", "200.100.50.1"
+        liberado = False
+        for regra in regras:
+            if regra["acao"] == "deny" and self.verificar_trafego_simples(regra, origem, destino) is None:
+                break
+            if regra["acao"] == "permit" and self.verificar_trafego_simples(regra, origem, destino):
+                liberado = True
+                regra["contador"] += 1
+                break
+        if liberado:
+            print(cr("  TI -> Internet    : LIBERADO", "green"))
+        else:
+            ok_ti = False
+            print(cr("  TI -> Internet    : BLOQUEADO! Falta o permit generico no fim.", "red"))
+
+        print()
+        if ok_rh and ok_ti and num_ok:
+            d.firewall_tested = True
+            print(cr("Firewall validado: RH preso, TI navegando.", "green"))
+            self.jogo.ganha_xp(50, "teste de trafego concluido")
+        else:
+            print(cr("Ainda nao: a config nao bloqueia o RH e libera o TI ao mesmo tempo.", "yellow"))
+            print(cr("Dica: a ordem das regras manda (a primeira que bate vale).", "dim"))
 
     def ac_ping(self):
         d = self.atual
@@ -1168,6 +1379,8 @@ class TerminalGame:
                     print(self.show_trunk())
                 elif arg == "switches":
                     print(self.ver_switches())
+                elif arg == "access-lists":
+                    print(self.show_access_lists())
                 elif arg == "ip":
                     sub = partes[2:3]
                     if sub == ["route"]:
@@ -1210,6 +1423,11 @@ class TerminalGame:
                 self.ac_ip(partes[1:])
             elif cmd == "access-list":
                 self.ac_access_list(arg_resto)
+            elif cmd == "simular":
+                if arg == "trafego":
+                    self.ac_simular(arg_resto)
+                else:
+                    self.comando_errado("% Use: simular trafego")
             elif cmd == "ping":
                 self.ac_ping()
             elif cmd == "end":
@@ -1272,6 +1490,11 @@ class TerminalGame:
             print(cr('  vai chorar de alegria. E olha, ROUTING michel. Aguenta esse"', "magenta"))
             print(cr('  emprego, garoto, que daqui a pouco voce me cobra."', "magenta"))
             print(cr('  (A Janaina deu o polegar por tras da porta.)', "dim"))
+        elif self.mid == "m4":
+            print(cr('Janaina: "Muro de pe. O RH nao decola mais na Diretoria e o', "magenta"))
+            print(cr('  gato do Valente costurou o link do TI sem cerol. ACL na veia."', "magenta"))
+            print(cr('  So falta voce me garantir a proxima."', "magenta"))
+            print(cr('  (No painel dela, o contador da sua deny sobe: 1 batida.)', "dim"))
         print()
         print(cr("Voltando a central de operacoes...", "dim"))
         if self.jogo.salvar():

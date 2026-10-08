@@ -31,7 +31,7 @@ Requer apenas **Python 3** (sem dependencias externas). O jogo roda 100% offline
 | 1 | O Primeiro Dia (JOGAVEL) | 1 | VLAN, modos do IOS, salvar config |
 | 2 | Unindo os Andares (JOGAVEL) | 2 | Trunk 802.1Q, VLANs multiplas |
 | 3 | Estradas da DC Corp (JOGAVEL) | 3 | Roteamento estatico, NAT/PAT |
-| 4 | O Muro da Empresa | 4 | Firewall/ACL, contadores |
+| 4 | O Muro da Empresa (JOGAVEL) | 4 | Firewall/ACL, contadores |
 | 5 | O Carteiro Digital | 5 | DHCP, DNS |
 | 6 | Espionando o Trafego | 6 | Wireshark, nmap |
 | 7 | Visao de Coruja | 7 | Wazuh/SIEM, resposta |
@@ -44,7 +44,7 @@ Requer apenas **Python 3** (sem dependencias externas). O jogo roda 100% offline
 
 Dentro do jogo, opcao **3** mostra o guia passo a passo de cada missao (quem passa, cenario, objetivo, o que aprende, recompensa e os passos exatos). Tambem da pra acessar por capitulo: `detonado 2`.
 
-## Gameplay atual (Capitulos 1, 2 e 3)
+## Gameplay atual (Capitulos 1, 2, 3 e 4)
 
 Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas proximas missoes):
 
@@ -56,11 +56,14 @@ Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas pr
 - `ip address <ip> <mascara>` / `no shutdown`
 - `ip route <rede> <mascara> <next-hop>` (rota estatica / default route)
 - `access-list <n> permit <rede> <wildcard>` + `ip nat inside source list <n> interface <if> overload`
-- `show vlan brief` / `show running-config` / `show interfaces trunk` / `show ip route` / `show ip nat translations`
+- `access-list <n> deny|permit ip <src> <wildcard> <dst> <wildcard>` (ACL extended)
+- `ip access-group <n> in|out` (aplicar ACL na interface)
+- `show vlan brief` / `show running-config` / `show interfaces trunk` / `show ip route` / `show ip nat translations` / `show access-lists`
 - `write memory` (salvar)
 - `conectar <host>` (trocar equipamento) — `show switches` lista os hosts
 - `help` / `dica` / `missao` / `progresso` / `detonado`
 - `ping 8.8.8.8` (prova da missao 3: diagnostica LAN -> rota -> NAT)
+- `simular trafego` (prova da missao 4: testa o firewall e alimenta os contadores)
 
 **Capitulo 1** (O Primeiro Dia): recriar a VLAN 10 (TI) nos dois switches e salvar.
 **Capitulo 2** (Unindo os Andares): criar a VLAN 20 (RH) nos dois switches, configurar a
@@ -68,6 +71,10 @@ porta `fa0/24` como trunk 802.1Q e liberar **apenas** as VLANs 10 e 20 no trunk.
 **Capitulo 3** (Estradas da DC Corp): configurar o roteador RT-01 — LAN (`fa0/0`,
 192.168.10.1/24), WAN (`fa0/1`, 200.100.50.2/30), rota padrao para o provedor, NAT
 overload (ACL 1 + inside/outside) — e provar com `ping 8.8.8.8` (4/4).
+**Capitulo 4** (O Muro da Empresa): trancar o RH na Diretoria. No RT-01, criar a ACL 100
+negando `192.168.20.0 -> 192.168.10.0` **antes** do `permit ip any any` generico, aplicar
+`ip access-group 100 in` na `fa0/1` (lado do RH), salvar e provar com `simular trafego`
+(RH bloqueado + TI livre) — a ordem das regras manda: a primeira que bate vale.
 
 > Regra de ouro logo no comeco: trunk aberto (`vlan any any`) vai escoar todas as
 > VLANs pelo cabo — porta aberta pra ladrao. Sempre limitar com
@@ -75,6 +82,10 @@ overload (ACL 1 + inside/outside) — e provar com `ping 8.8.8.8` (4/4).
 >
 > E no roteador: IP privado chegando na borda sem NAT morre ali. Nenhum IP interno
 > ultrapassa o `inside` sem virar o IP publico no `outside`.
+>
+> E no firewall: ACL e avaliada de cima pra baixo — regra especifica que nega vem
+> ANTES da regra generica que permite. O contador do `show access-lists` prova
+> (ou flagra) quem bateu em qual regra.
 
 ## Save automatico
 
@@ -83,9 +94,8 @@ Seu progresso (XP, cargo, missoes concluidas) fica salvo em `save_dc_corp.json`
 
 ## Proximos passos (curto prazo)
 
-1. **Missao 4 jogavel** (firewall: ordem de regras e contadores)
-2. **Missao 5 jogavel** (DHCP/DNS como servidor)
-3. **Salto para Godot** (versao Android offline com o mesmo conteudo)
+1. **Missao 5 jogavel** (DHCP/DNS como servidor)
+2. **Salto para Godot** (versao Android offline com o mesmo conteudo)
 
 ## Teste automatizado
 
