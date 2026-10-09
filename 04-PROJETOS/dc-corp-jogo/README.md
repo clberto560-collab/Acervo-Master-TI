@@ -58,6 +58,15 @@ Uma passada visual por cima do mesmo jogo:
 
 > A **progressao do jogo espelha o roadmap de estudo do acervo** — cada missao jogavel e um modulo concluido no mundo real e uma gameplay nova no jogo.
 
+## Trilha de Aprendizado (o Acervo no jogo)
+
+No menu da Central, opcao **5** (ou o comando `trilha` dentro do terminal, e o botao **TRILHA** no Modo Historia) mostra a **JORNADA**: todo o mapa de estudo do Acervo Master TI virou trilha de missoes, organizada por tema.
+
+- **Tema** = um mundo (Redes, Cabeamento, Mikrotik, Ubiquiti, Huawei, Zabbix, DataCenter).
+- **Topico** = uma trilha de missoes; os que ja tem gameplay aparecem como **JOGAVEL** e ficam **CONCLUIDO** quando as missoes ligadas forem vencidas. O resto vem **EM BREVE**.
+- Horas de curso viram **XP de meta** (1h = 100 XP), pra "estudei no mundo real" bater com "subi no jogo".
+- Ex.: o topico *Switches Ethernet - Parte I* e jogavel hoje (missoes 1-2: VLAN + trunk), *Roteamento IP e RIP* e *NAT, Proxy e BGP* tambem (missao 3).
+
 ## O Detonado
 
 Dentro do jogo, opcao **3** mostra o guia passo a passo de cada missao (quem passa, cenario, objetivo, o que aprende, recompensa e os passos exatos). Tambem da pra acessar por capitulo: `detonado 2`.

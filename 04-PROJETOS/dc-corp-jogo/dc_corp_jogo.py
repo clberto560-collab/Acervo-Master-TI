@@ -426,6 +426,119 @@ def mapa_missoes(jogo):
         linhas.append(f"  Cap.{m['capitulo']:>2} | Lv.{m['lv']:<2} | {badge} | {m['titulo']}")
     linhas.append("")
     linhas.append(cr("Para o DETONADO de uma missao:  detonado <numero-do-capitulo>", "dim"))
+    linhas.append(cr("Para a JORNADA completa do Acervo (tema -> topicos):  trilha", "dim"))
+    return "\n".join(linhas)
+
+
+# ---------------------------------------------------------------------------
+# JORNADA DE APRENDIZADO (espelha o Acervo Master TI)
+# ---------------------------------------------------------------------------
+# Cada "tema" e um mundo; cada topico e uma trilha de missoes no jogo.
+# As missoes jogaveis atuais sao vinculadas aos topicos equivalentes.
+# ""missoes"" vazio => topico ainda nao tem gameplay (EM BREVE).
+
+TRILHA = [
+    {
+        "tema": "Redes",
+        "topicos": [
+            {"nome": "Modelo OSI", "horas": 8, "missoes": []},
+            {"nome": "Protocolo TCP/IP", "horas": 8, "missoes": []},
+            {"nome": "Protocolo IPv4 e Classes", "horas": 6, "missoes": []},
+            {"nome": "IPv4: Sub-Redes, VLSM e CIDR", "horas": 12, "missoes": []},
+            {"nome": "Dispositivos e Topologias de Rede", "horas": 8, "missoes": []},
+            {"nome": "Clientes de Rede", "horas": 2, "missoes": []},
+            {"nome": "Protocolos e Servicos de Rede", "horas": 8, "missoes": []},
+            {"nome": "Switches Ethernet - Parte I", "horas": 10, "missoes": ["m1", "m2"]},
+            {"nome": "Switches Ethernet - Parte II", "horas": 10, "missoes": []},
+            {"nome": "Protocolo Spanning Tree de A a Z", "horas": 10, "missoes": []},
+            {"nome": "Roteamento IP e RIP", "horas": 6, "missoes": ["m3"]},
+            {"nome": "Internet - NAT, Proxy e BGP", "horas": 4, "missoes": ["m3"]},
+            {"nome": "Wireless LAN (Redes sem fio)", "horas": 8, "missoes": []},
+            {"nome": "Network Troubleshooting", "horas": 6, "missoes": []},
+        ],
+    },
+    {
+        "tema": "Cabeamento",
+        "topicos": [
+            {"nome": "Cabeamento Estruturado Metalico", "horas": 16, "missoes": []},
+            {"nome": "Cabeamento Estruturado Fibra", "horas": 16, "missoes": []},
+            {"nome": "Cabeamento Profissional", "horas": 24, "missoes": []},
+            {"nome": "Cabeamento - Gestao de Equipe", "horas": 16, "missoes": []},
+            {"nome": "Certificacao de Enlaces em Par Metalico", "horas": 16, "missoes": []},
+            {"nome": "Cabos de Fibra Optica (caracteristicas)", "horas": 16, "missoes": []},
+            {"nome": "Certificacao de Enlaces Opticos (Tier 1)", "horas": 16, "missoes": []},
+            {"nome": "Teste de Enlaces Opticos com OTDR", "horas": 16, "missoes": []},
+            {"nome": "Orcamento de Perda e Potencia Optica", "horas": 16, "missoes": []},
+            {"nome": "Taxa de Ocupacao de Caminhos", "horas": 16, "missoes": []},
+            {"nome": "Pratica com Tecnologia em Fibra Optica", "horas": 8, "missoes": []},
+        ],
+    },
+    {
+        "tema": "Mikrotik",
+        "topicos": [
+            {"nome": "MTCNA (Oficial)", "horas": 24, "missoes": []},
+            {"nome": "MTCRE (Oficial)", "horas": 16, "missoes": []},
+            {"nome": "MTCSE (Oficial)", "horas": 16, "missoes": []},
+        ],
+    },
+    {
+        "tema": "Ubiquiti",
+        "topicos": [
+            {"nome": "UFSP (Oficial)", "horas": 6, "missoes": []},
+            {"nome": "UWA (Oficial)", "horas": 16, "missoes": []},
+        ],
+    },
+    {
+        "tema": "Huawei",
+        "topicos": [
+            {"nome": "Curso Huawei Oficial", "horas": 16, "missoes": []},
+        ],
+    },
+    {
+        "tema": "Zabbix",
+        "topicos": [
+            {"nome": "Zabbix do Zero", "horas": 16, "missoes": []},
+        ],
+    },
+    {
+        "tema": "DataCenter",
+        "topicos": [
+            {"nome": "Fundamentos em DataCenter", "horas": 16, "missoes": []},
+        ],
+    },
+]
+
+
+def estado_topico(jogo, top):
+    vinc = top.get("missoes", [])
+    if not vinc:
+        return "breve", cr(" EM BREVE  ", "dim")
+    if all(v in jogo.missoes for v in vinc):
+        return "concluido", cr("CONCLUIDO ", "green")
+    return "proximo", cr("JOGAVEL   ", "cyan")
+
+
+def texto_trilha(jogo):
+    linhas = [cr("== JORNADA DE APRENDIZADO (Acervo Master TI) ==", "bold")]
+    linhas.append(cr("Cada topico do acervo vira missoes no jogo, tema a tema.", "dim"))
+    linhas.append("")
+    geral = {"jogaveis": 0, "concluidos": 0, "total": 0}
+    for trilha in TRILHA:
+        linhas.append(cr(f"[ {trilha['tema'].upper()} ]", "cyan"))
+        horas_tema = sum(t["horas"] for t in trilha["topicos"])
+        for i, top in enumerate(trilha["topicos"], 1):
+            estado, badge = estado_topico(jogo, top)
+            geral["total"] += 1
+            if estado == "concluido":
+                geral["concluidos"] += 1
+            if estado == "proximo":
+                geral["jogaveis"] += 1
+            linhas.append(f"  {i:>2}. {top['nome']:<50} {badge} ({top['horas']}h)")
+        linhas.append(cr(f"     total: {horas_tema}h  |  xp de meta: {horas_tema * 100}", "dim"))
+        linhas.append("")
+    linhas.append(cr("JORNADA:" + f" {geral['concluidos']}/{geral['total']} topicos concluidos"
+                                     f"  |  {geral['jogaveis']} jogaveis (proximas missoes)", "yellow"))
+    linhas.append(cr("(topicos EM BREVE ganham gameplay nas proximas atualizacoes)", "dim"))
     return "\n".join(linhas)
 
 
@@ -744,7 +857,7 @@ class TerminalGame:
                     "  show ip route / interfaces trunk",
                     "  ping 8.8.8.8                    testa a saida",
                     "  missao / progresso / detonado / dica",
-                    "  help / sair",
+                    "  trilha (jornada do Acervo) / help / sair",
                 ]
             else:
                 linhas = [
@@ -754,7 +867,7 @@ class TerminalGame:
                     "  show interfaces trunk / show switches",
                     "  conectar SW-01|SW-02            troca de equipamento",
                     "  missao / progresso / detonado / dica",
-                    "  help / sair",
+                    "  trilha (jornada do Acervo) / help / sair",
                 ]
         elif d["modo"] == "priv":
             if eh_router:
@@ -1368,6 +1481,8 @@ class TerminalGame:
                 print(mostrar_detonado(self.jogo, self.missao["capitulo"]))
             elif cmd == "dica":
                 print(self.dica())
+            elif cmd in ("trilha", "jornada"):
+                print(texto_trilha(self.jogo))
             elif cmd == "show":
                 if arg == "vlan":
                     print(self.show_vlan_brief())
@@ -1545,7 +1660,8 @@ def central(jogo):
         print("   2) Mapa de missoes (todos os capitulos)")
         print("   3) Detonado (guia passo a passo)")
         print("   4) Perfil (nivel, XP, cargo)")
-        print("   5) Sair")
+        print("   5) Trilha de Aprendizado (Acervo)")
+        print("   6) Sair")
         print(cr("   ===============================================", "dim"))
         escolha = ler("  > ").strip()
         if escolha == "eof":
@@ -1565,6 +1681,9 @@ def central(jogo):
             print()
             print(jogo.status_perfil())
         elif escolha == "5":
+            print()
+            print(texto_trilha(jogo))
+        elif escolha == "6":
             break
         elif escolha.startswith("detonado"):
             partes = escolha.split()
@@ -1582,8 +1701,11 @@ def central(jogo):
         elif escolha in ("perfil", "ficha"):
             print()
             print(jogo.status_perfil())
+        elif escolha in ("trilha", "jornada"):
+            print()
+            print(texto_trilha(jogo))
         else:
-            print(cr("Comando nao reconhecido. Use os numeros 1 a 5.", "red"))
+            print(cr("Comando nao reconhecido. Use os numeros 1 a 6.", "red"))
     if jogo.salvar():
         print(cr("Progresso salvo em save_dc_corp.json.", "green"))
 

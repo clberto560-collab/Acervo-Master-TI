@@ -326,6 +326,10 @@ class App(tk.Tk):
                                 bg=U["painel2"], fg=U["vermelho"], bd=0,
                                 command=lambda: self._painel_dinamico(self.tg.dica))
         self.b_dica.pack(side="left")
+        self.b_trilha = tk.Button(tb, text="TRILHA", font=self.f_nrm,
+                                  bg=U["painel2"], fg=U["roxo"], bd=0,
+                                  command=self._painel_trilha)
+        self.b_trilha.pack(side="left", padx=(6, 0))
         self.guia = tk.Text(p_dir, bg=U["painel2"], fg=U["texto"],
                             font=self.f_det, wrap="word", bd=0, padx=10, pady=10)
         self.guia.pack(fill="both", expand=True)
@@ -362,6 +366,9 @@ class App(tk.Tk):
         except Exception as exc:
             txt = f"(erro ao consultar: {exc})"
         self._set_guia(txt)
+
+    def _painel_trilha(self):
+        self._set_guia(core.texto_trilha(self.jogo))
 
     def _set_guia(self, txt):
         self.guia.config(state="normal")
