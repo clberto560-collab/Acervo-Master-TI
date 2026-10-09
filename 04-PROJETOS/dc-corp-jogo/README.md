@@ -4,11 +4,29 @@
 
 ## Como rodar
 
+Modo terminal (o classico):
+
 ```
 python dc_corp_jogo.py
 ```
 
-Requer apenas **Python 3** (sem dependencias externas). O jogo roda 100% offline no terminal do PC (proximo passo: versao Android).
+Modo historia (prototipo visual com cenas e baloes de conversa + terminal com Detonado do lado):
+
+```
+python dc_corp_gui.py
+```
+
+Requer apenas **Python 3** (sem dependencias externas; o modo visual usa o tkinter que ja vem no Windows). O jogo roda 100% offline no terminal do PC (proximo passo: versao Android).
+
+## Modo Historia (o visual)
+
+Uma passada visual por cima do mesmo jogo:
+
+- **Narrativa:** cada missao abre com uma cena desenhada (predios, silhuetas dos personagens) e os baloes de conversa digitando, como quadrinho. Avanca com o botao.
+- **Missao:** o TERMINAL abre de um lado e o DETONADO (guia passo a passo) fica do outro, o tempo todo. Alem do guia, botões de MISSAO (objetivo), PROGRESSO (requisitos em tempo real) e DICA.
+- A engine de terminal (`dc_corp_jogo.py`) e reaproveitada 100% - os comandos sao os mesmos.
+- Salve o progresso normalmente: o modo visual usa o mesmo `save_dc_corp.json`.
+- O clima da cena muda com o capitulo (cap.4 ganha o muro do firewall no desenho).
 
 ## O loop do jogo (RPG)
 
@@ -95,7 +113,8 @@ Seu progresso (XP, cargo, missoes concluidas) fica salvo em `save_dc_corp.json`
 ## Proximos passos (curto prazo)
 
 1. **Missao 5 jogavel** (DHCP/DNS como servidor)
-2. **Salto para Godot** (versao Android offline com o mesmo conteudo)
+2. **Evolucao do Modo Historia** (artes finais dos personagens, animacoes de transicao, som)
+3. **Salto para Godot** (versao Android offline com o mesmo conteudo)
 
 ## Teste automatizado
 
