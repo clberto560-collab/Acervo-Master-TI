@@ -50,8 +50,8 @@ Uma passada visual por cima do mesmo jogo:
 | 2 | Unindo os Andares (JOGAVEL) | 2 | Trunk 802.1Q, VLANs multiplas |
 | 3 | Estradas da DC Corp (JOGAVEL) | 3 | Roteamento estatico, NAT/PAT |
 | 4 | O Muro da Empresa (JOGAVEL) | 4 | Firewall/ACL, contadores |
-| 5 | O Carteiro Digital | 5 | DHCP, DNS |
-| 6 | Espionando o Trafego | 6 | Wireshark, nmap |
+| 5 | Trunk ou Access Trocado (JOGAVEL) | 5 | Porta access vs trunk, diagnosticar layer 2 |
+| 6 | A VLAN Fantasma (JOGAVEL) | 6 | Allowed vlan, VLAN nativa, remover VLAN fantasma |
 | 7 | Visao de Coruja | 7 | Wazuh/SIEM, resposta |
 | 8 | A Infra que se Configura Sozinha | 8 | Python+Netmiko, Ansible |
 | 9 | O Defensor Final | 9 | Defesa completa (red team simulado) |
@@ -85,15 +85,16 @@ As fases (ordem da empresa, tal qual a Jornada):
 
 Dentro do jogo, opcao **3** mostra o guia passo a passo de cada missao (quem passa, cenario, objetivo, o que aprende, recompensa e os passos exatos). Tambem da pra acessar por capitulo: `detonado 2`.
 
-## Gameplay atual (Capitulos 1, 2, 3 e 4)
+## Gameplay atual (Capitulos 1, 2, 3, 4, 5 e 6)
 
 Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas proximas missoes):
 
 - `enable` (modo privilegiado)
 - `configure terminal` (modo config)
-- `vlan <n>` / `name <nome>`
+- `vlan <n>` / `name <nome>` / `no vlan <n>` (remove uma VLAN - caça a fantasma)
 - `interface fa0/24` (modo interface, switch) e `interface fa0/0`/`fa0/1` (roteador)
-- `switchport mode trunk` / `switchport trunk allowed vlan 10,20`
+- `switchport mode trunk` / `switchport mode access` / `switchport access vlan <n>`
+- `switchport trunk allowed vlan 10,20` / `switchport trunk native vlan <n>`
 - `ip address <ip> <mascara>` / `no shutdown`
 - `ip route <rede> <mascara> <next-hop>` (rota estatica / default route)
 - `access-list <n> permit <rede> <wildcard>` + `ip nat inside source list <n> interface <if> overload`
@@ -104,7 +105,7 @@ Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas pr
 - `conectar <host>` (trocar equipamento) — `show switches` lista os hosts
 - `help` / `dica` / `missao` / `progresso` / `detonado`
 - `ping 8.8.8.8` (prova da missao 3: diagnostica LAN -> rota -> NAT)
-- `simular trafego` (prova da missao 4: testa o firewall e alimenta os contadores)
+- `simular trafego` (prova das missoes 4, 5 e 6: testa ACL / access x trunk / trunk e fantasma)
 
 **Capitulo 1** (O Primeiro Dia): recriar a VLAN 10 (TI) nos dois switches e salvar.
 **Capitulo 2** (Unindo os Andares): criar a VLAN 20 (RH) nos dois switches, configurar a

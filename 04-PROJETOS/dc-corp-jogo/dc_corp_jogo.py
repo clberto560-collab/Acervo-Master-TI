@@ -310,37 +310,58 @@ MISSOES = {
     "m5": {
         "id": "m5",
         "capitulo": 5,
-        "titulo": "O Carteiro Digital",
-        "estado": 2,
+        "titulo": "Trunk ou Access Trocado",
+        "estado": 1,
         "lv": 5,
         "npc": "Supervisora Janaina Lopes",
-        "ambientacao": "120 computadores pra configurar na mao todo dia. A DC Corp precisa de DHCP.",
-        "objetivo": "Subir um servidor DHCP e DNS funcional para as redes da DC Corp.",
-        "aprender": "DHCP (DORA, lease, pool) e DNS (resolucao, registros).",
+        "ambientacao": "Depois da festa dos trunks, alguem embaralhou os papeis: o uplink virou porta comum e o PC da sala virou trunk. Nada sobe direito.",
+        "objetivo": "Corrigir o SW-01: fa0/1 como access (VLAN 10/TI), fa0/24 como trunk 802.1Q, testar o trafego e salvar.",
+        "aprender": "Diferenca entre porta access e trunk no 802.1Q, e como diagnosticar porta trocada.",
         "recompensa": 1000,
+        "cena_intro": [
+            'Supervisora JANAINA LOPES aponta pro painel:',
+            '"Estagiario, o cabeamento ta ``no seco``: o PC da sala sobe no modo',
+            '  trunk e o uplink virou porta comum. Resumindo: ninguem conversa',
+            '  com ninguem. Entra no SW-01 e resolve essa bagunca de layer 2."',
+            '"(Dica: show interfaces trunk e show running-config entregam o erro.)"',
+        ],
         "guia": [
-            "1) Configurar pool DHCP para cada rede.",
-            "2) Apontar gateway e DNS no pool.",
-            "3) Configurar registros de DNS internos.",
-            "4) Provar: host pega IP por DHCP e resolve nomes.",
+            "1) Diagnostique:  show running-config  e  show interfaces trunk",
+            "2) Repare que fa0/1 esta como trunk (errado: e porta de escritorio)",
+            "3) Repare que fa0/24 esta como access (errado: e o uplink/trunk)",
+            "4) Corrija fa0/24: configure terminal -> interface fa0/24 -> switchport mode trunk",
+            "5) Libere a VLAN: switchport trunk allowed vlan 10",
+            "6) Corrija fa0/1: interface fa0/1 -> switchport mode access -> switchport access vlan 10",
+            "7) Saia e teste:  simular trafego  (PC da sala deve conectar na VLAN 10)",
+            "8) Salve:  write memory",
         ],
     },
     "m6": {
         "id": "m6",
         "capitulo": 6,
-        "titulo": "Espionando o Trafego",
-        "estado": 2,
+        "titulo": "A VLAN Fantasma",
+        "estado": 1,
         "lv": 6,
-        "npc": "Dra. Santos (Seguranca)",
-        "ambientacao": "Alguem esta mandando dados pra fora na calada da noite. A DC Corp precisa de olhos.",
-        "objetivo": "Capturar e analisar trafego da rede e encontrar o trafego suspeito.",
-        "aprender": "Wireshark (filtros), nmap e identificacao de anomalias.",
+        "npc": "Supervisora Janaina Lopes",
+        "ambientacao": "A VLAN 20 do RH nao atravessa o trunk, e no SHOW VLAN BRIEF do SW-02 existe uma VLAN 999 que ninguem mandou criar. Trafego fantasma perambulando.",
+        "objetivo": "No SW-01 e SW-02: liberar apenas as VLANs 10 e 20 no trunk, configurar a VLAN nativa 99, exterminar a VLAN fantasma (999) e salvar tudo.",
+        "aprender": "Allowed vlan no trunk, VLAN nativa (native) e caca a VLAN fantasma.",
         "recompensa": 1200,
+        "cena_intro": [
+            'JANAINA fecha a cara pro monitor:',
+            '"O RH ta gritando que a rede nao ve mais o servidor da TI. E pior:',
+            '  tem uma VLAN 999 na config do SW-02. Vtrunk de fantasma cruzando',
+            '  o corredor. A limpa ela e libera so o que precisa passar."',
+            '"(VLAN nativa padrao da DC: 99. Ah, e confere os DOIS switches.)"',
+        ],
         "guia": [
-            "1) Escanear a rede-alvo com nmap (hosts e servicos).",
-            "2) Capturar trafego com Wireshark/filtros.",
-            "3) Identificar protocolos e portas suspeitas.",
-            "4) Relatar o que encontrou como ticket de seguranca.",
+            "1) Diagnostique a porta trunk nos dois:  show interfaces trunk",
+            "2) Perceba: a VLAN 20 NAO esta no allowed vlan, e a 999 esta.",
+            "3) Corrija o trunk (nos dois switches): interface fa0/24 -> switchport trunk allowed vlan 10,20",
+            "4) Ajuste a VLAN nativa: switchport trunk native vlan 99",
+            "5) Extermine a fantasma no SW-02: configure terminal -> no vlan 999",
+            "6) Teste o trafego:  simular trafego  em cada equipamento",
+            "7) Salve:  write memory  em cada um",
         ],
     },
     "m7": {
@@ -488,14 +509,15 @@ TRILHA = [
                  ("r7-1", "Servicos em ordem", "subir e enxergar DHCP, DNS, HTTP e FTP na rede certa"),
                  ("r7-2", "Portas e protocolos", "liberar no firewall o servico que a firma precisa"),
                  ("r7-3", "O vizinho ARP", "resolver erros de ARP no cenario da DC"),
+                 ("r7-4", "O carteiro digital", "subir DHCP (DORA, lease, pool) e DNS de verdade"),
              ])},
             {"nome": "Switches Ethernet - Parte I", "horas": 10,
              "requer": ["Dispositivos e Topologias de Rede", "Protocolos e Servicos de Rede"],
              "missoes": _mis([
                  ("m1", "VLAN na mao, porta a porta", "diagramar as VLANs da DC Corp e configurar porta por porta"),
-                 ("m2", "Trunk entre os andares", "estender as VLANs entre os switches com tres eietiqueta 802.1Q"),
-                 ("r8-3", "Access ou trunk trocado", "usa deu certo mas a porta errada vazou a VLAN para o desktop"),
-                 ("r8-4", "VLAN fantasma", "auditar a config: a VLAN nativa do trunk conta conversa cruzada"),
+                 ("m2", "Trunk entre os andares", "estender as VLANs entre os switches com etiqueta 802.1Q"),
+                 ("m5", "Trunk ou Access Trocado", "portas embaralhadas: uplink como access e PC como trunk"),
+                 ("m6", "A VLAN Fantasma", "nativa errada, allowed vlan sem a rede certa e VLAN fantasma no trunk"),
              ])},
             {"nome": "Switches Ethernet - Parte II", "horas": 10, "requer": ["Switches Ethernet - Parte I"],
              "missoes": _mis([
@@ -538,6 +560,7 @@ TRILHA = [
                  ("r14-1", "O andar 15 caiu", "diagnostico guiado: ping, traceroute, ARP ate achar o problema"),
                  ("r14-2", "Lentidao misteriosa", "caca ao gargalo que ninguem acha"),
                  ("r14-3", "Caos documentado", "padronizar as configs para o proximo estagiario sobreviver"),
+                 ("r14-4", "Espionando o trafego", "capturar trafego, filtrar e achar a anomalia"),
              ])},
         ],
     },
@@ -858,6 +881,7 @@ class Device:
         self.nat_outside = set()
         self.acl_listas = {}
         self.firewall_tested = False
+        self.trafego_ok = False
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -878,6 +902,15 @@ class Device:
                 allowed = itf["trunk_allowed"]
                 info.append((nome, allowed))
         return info
+
+    def trunk_carrega(self, *vlans):
+        t = self.interfaces.get("fa0/24")
+        if not (t and t["mode"] == "trunk" and t["trunk_allowed"] is not None):
+            return False
+        return set(vlans) <= t["trunk_allowed"]
+
+    def native_vlan(self, nome="fa0/24"):
+        return self.interfaces.get(nome, {}).get("native_vlan", 1)
 
     def acl_aplicada(self, nome_if, direcao):
         return self.interfaces.get(nome_if, {}).get(f"acl_{direcao}")
@@ -941,6 +974,14 @@ def checar_missao(mid, d):
         return ok_lan and ok_wan and ok_rotas and d.nat_completo() and d.saved
     if mid == "m4":
         return d.firewall_ok() and d.firewall_tested and d.saved
+    if mid == "m5":
+        p = d.interfaces.get("fa0/1")
+        ok_pc = bool(p) and p["mode"] == "access" and p["access_vlan"] == 10
+        return ok_pc and d.trunk_carrega(10) and d.trafego_ok and d.saved
+    if mid == "m6":
+        ok_tr = d.trunk_carrega(10, 20)
+        sem_fantasma = 999 not in d.vlans
+        return ok_tr and sem_fantasma and d.native_vlan() == 99 and d.trafego_ok and d.saved
     return False
 
 
@@ -982,6 +1023,24 @@ class TerminalGame:
             r.interfaces["fa0/0"]["ip"] = "192.168.10.1/255.255.255.0"
             r.interfaces["fa0/1"]["ip"] = "192.168.20.1/255.255.255.0"
             self.devices = {"RT-01": r}
+        elif mid == "m5":
+            s = device_vazio("SW-01")
+            s.vlans = {1: "default", 10: "TI", 20: "RH"}
+            s.interfaces["fa0/1"] = {"mode": "trunk", "access_vlan": 1, "trunk_allowed": {10},
+                                     "ip": None, "up": True, "acl_in": None, "acl_out": None}
+            s.interfaces["fa0/24"] = {"mode": "access", "access_vlan": 1, "trunk_allowed": None,
+                                      "ip": None, "up": True, "acl_in": None, "acl_out": None}
+            self.devices = {"SW-01": s}
+        elif mid == "m6":
+            s1 = device_vazio("SW-01")
+            s1.vlans = {1: "default", 10: "TI", 20: "RH"}
+            s1.interfaces["fa0/24"] = {"mode": "trunk", "access_vlan": 1, "trunk_allowed": {10, 999},
+                                       "ip": None, "up": True, "acl_in": None, "acl_out": None}
+            s2 = device_vazio("SW-02")
+            s2.vlans = {1: "default", 10: "TI", 999: "fantasma"}
+            s2.interfaces["fa0/24"] = {"mode": "trunk", "access_vlan": 1, "trunk_allowed": {10, 999},
+                                       "ip": None, "up": True, "acl_in": None, "acl_out": None}
+            self.devices = {"SW-01": s1, "SW-02": s2}
         else:
             self.devices = {"SW-01": device_vazio("SW-01"), "SW-02": device_vazio("SW-02")}
 
@@ -1051,6 +1110,37 @@ class TerminalGame:
                     requisitos.append("teste de trafego ok")
                 else:
                     requisitos.append("teste de trafego: nao rodou")
+            if self.mid == "m5":
+                if d.trunk_carrega(10):
+                    requisitos.append("uplink trunk liberando VLAN 10")
+                else:
+                    requisitos.append("uplink fa0/24 como trunk 10: pendente")
+                p = d.interfaces.get("fa0/1")
+                if p and p["mode"] == "access" and p["access_vlan"] == 10:
+                    requisitos.append("PC fa0/1 access VLAN 10")
+                else:
+                    requisitos.append("PC fa0/1 access VLAN 10: pendente")
+                if d.trafego_ok:
+                    requisitos.append("teste de trafego ok")
+                else:
+                    requisitos.append("teste de trafego: nao rodou")
+            if self.mid == "m6":
+                if d.trunk_carrega(10, 20):
+                    requisitos.append("trunk permitindo so 10 e 20")
+                else:
+                    requisitos.append("trunk allowed vlan 10,20: pendente")
+                if 999 not in d.vlans:
+                    requisitos.append("VLAN fantasma 999 nao existe")
+                else:
+                    requisitos.append("VLAN fantasma 999 AINDA existe")
+                if d.native_vlan() == 99:
+                    requisitos.append("native vlan 99")
+                else:
+                    requisitos.append("native vlan 99: pendente")
+                if d.trafego_ok:
+                    requisitos.append("teste de trafego ok")
+                else:
+                    requisitos.append("teste de trafego: nao rodou")
             requisitos.append("salvo" if d.saved else "NAO salvo")
             ok_tudo = checar_missao(self.mid, d)
             marca = cr("OK", "green") if ok_tudo else cr("FALTA", "yellow")
@@ -1104,6 +1194,29 @@ class TerminalGame:
             if not d.saved:
                 return "Falta salvar: write memory"
             return "Muro de pe. Olha o contador no show access-lists."
+        if self.mid == "m5":
+            if not d.trunk_carrega(10):
+                return "Uplink errado: interface fa0/24 -> switchport mode trunk -> switchport trunk allowed vlan 10"
+            p = d.interfaces.get("fa0/1")
+            if not (p and p["mode"] == "access" and p["access_vlan"] == 10):
+                return "Porta do PC trocada: interface fa0/1 -> switchport mode access -> switchport access vlan 10"
+            if not d.trafego_ok:
+                return "Confirme que o PC conecta:  simular trafego"
+            if not d.saved:
+                return "Falta salvar: write memory"
+            return "Portas na ordem certa. O show interfaces trunk nao mente mais."
+        if self.mid == "m6":
+            if not d.trunk_carrega(10, 20):
+                return "Trunk so com 10 e 20: interface fa0/24 -> switchport trunk allowed vlan 10,20"
+            if d.native_vlan() != 99:
+                return "VLAN nativa padrao da DC: interface fa0/24 -> switchport trunk native vlan 99"
+            if 999 in d.vlans:
+                return "Mate a fantasma: configure terminal -> no vlan 999 (quando estiver no SW-02)"
+            if not d.trafego_ok:
+                return "Rode  simular trafego  neste equipamento"
+            if not d.saved:
+                return "Falta salvar: write memory"
+            return "Trunk enxuto. A fantasma virou po."
         return "Digite help para ver comandos."
 
     def help_tela(self):
@@ -1142,9 +1255,10 @@ class TerminalGame:
                 ]
             else:
                 linhas = [
-                    cr("== MODO PRIVILEGIADO ==", "bold"),
+                    cr("== MODO PRIVILEGIADO (switch) ==", "bold"),
                     "  configure terminal              modo de configuracao",
                     "  show vlan brief / running-config / interfaces trunk",
+                    "  simular trafego                 testa a camada 2 (trunk/ACL)",
                     "  write memory                    salva a config",
                     "  exit / end                      navegacao",
                 ]
@@ -1152,6 +1266,7 @@ class TerminalGame:
             linhas = [
                 cr("== CONFIGURACAO GLOBAL ==", "bold"),
                 "  vlan <numero>                   cria/entra na VLAN",
+                "  no vlan <numero>                remove uma VLAN do switch",
                 "  interface fa0/24                entra na interface",
                 "  ip route <rede> <masc> <next-hop>   rota estatica",
                 "  access-list <n> permit|deny <src> <wild> [<dst> <wild>]  ACL",
@@ -1176,11 +1291,12 @@ class TerminalGame:
                 ]
             else:
                 linhas = [
-                    cr(f"== INTERFACE {d.ctx_if} ==", "bold"),
+                    cr(f"== INTERFACE {d.ctx_if} (switch) ==", "bold"),
                     "  switchport mode trunk           vira trunk",
                     "  switchport mode access          vira porta comum",
                     "  switchport access vlan <n>      poe a porta na VLAN",
                     "  switchport trunk allowed vlan <a>,<b>   limita VLANs",
+                    "  switchport trunk native vlan <n>   VLAN nativa (sem tag)",
                     "  exit / end",
                 ]
         return "\n".join(linhas)
@@ -1241,6 +1357,8 @@ class TerminalGame:
                     partes.append(f" ip access-group {itf['acl_out']} out")
             elif itf["mode"] == "trunk":
                 partes.append(" switchport mode trunk")
+                if itf.get("native_vlan") is not None:
+                    partes.append(f" switchport trunk native vlan {itf['native_vlan']}")
                 if itf["trunk_allowed"] is not None:
                     partes.append(" switchport trunk allowed vlan " +
                                   ",".join(str(v) for v in sorted(itf["trunk_allowed"])))
@@ -1307,7 +1425,7 @@ class TerminalGame:
         linhas = ["", "Port        Mode         Encapsulation  Status        Native vlan",
                   "------      ------------ -------------  ------------- -------------"]
         for nome_if, allowed in d.trunk_info():
-            linhas.append(f"{nome_if:<12} on          802.1q         trunking      1")
+            linhas.append(f"{nome_if:<12} on          802.1q         trunking      {d.native_vlan(nome_if)}")
         linhas.append("")
         linhas.append("Port        Vlans allowed on trunk")
         linhas.append("------      -----------------------")
@@ -1459,8 +1577,21 @@ class TerminalGame:
                     return
                 itf["trunk_allowed"] = vlans
                 self.jogo.ganha_xp(25, f"trunk liberado para: {sorted(vlans)}")
-            else:
-                self.comando_errado("% Use: switchport trunk allowed vlan <a>,<b>")
+                return
+            if len(partes) >= 4 and partes[1] == "native" and partes[2] == "vlan":
+                try:
+                    vid = int(partes[3])
+                except ValueError:
+                    self.comando_errado("% Invalid vlan number.")
+                    return
+                if not (1 <= vid <= 4094):
+                    self.comando_errado("% VLAN id must be between 1 and 4094.")
+                    return
+                itf["native_vlan"] = vid
+                self.jogo.ganha_xp(30, f"native vlan {vid} em {nome}")
+                print(cr(f"VLAN nativa do trunk {nome} = {vid} (frames sem tag agora ficam nessa VLAN).", "green"))
+                return
+            self.comando_errado("% Use: switchport trunk allowed vlan <a>,<b>  |  switchport trunk native vlan <n>")
             return
         self.comando_errado("% Invalid switchport command.")
 
@@ -1476,15 +1607,38 @@ class TerminalGame:
 
     def ac_no(self, arg_resto):
         d = self.atual
-        if d["modo"] != "conf-if":
-            self.comando_errado("% no is only allowed inside an interface.")
+        if d["modo"] == "conf-if":
+            if arg_resto.lower().startswith("shutdown"):
+                d["interfaces"][d["ctx_if"]]["up"] = True
+                self.jogo.ganha_xp(10, f"{d['ctx_if']} no shutdown")
+                print(cr(f"Interface {d['ctx_if']} UP.", "green"))
+            else:
+                self.comando_errado("% Use: no shutdown")
             return
-        if arg_resto.lower().startswith("shutdown"):
-            d["interfaces"][d["ctx_if"]]["up"] = True
-            self.jogo.ganha_xp(10, f"{d['ctx_if']} no shutdown")
-            print(cr(f"Interface {d['ctx_if']} UP.", "green"))
-        else:
-            self.comando_errado("% Use: no shutdown")
+        if d["modo"] == "conf":
+            partes = arg_resto.lower().split()
+            if partes and partes[0] == "vlan":
+                try:
+                    vid = int(partes[1])
+                except (ValueError, IndexError):
+                    self.comando_errado("% Use: no vlan <numero>")
+                    return
+                if vid not in d["vlans"]:
+                    self.comando_errado(cr("% VLAN " + str(vid) + " nao existe neste switch.", "yellow"))
+                    return
+                if vid == 1:
+                    self.comando_errado("% Nao da pra derrubar a VLAN 1 (default).")
+                    return
+                morto = d["vlans"].pop(vid, None)
+                for itf in d["interfaces"].values():
+                    if itf.get("trunk_allowed"):
+                        itf["trunk_allowed"].discard(vid)
+                self.jogo.ganha_xp(40, f"VLAN {vid} exterminada")
+                print(cr(f"VLAN {vid} ({morto}) removida do banco e liberada dos trunks.", "green"))
+                return
+            self.comando_errado("% Use: no vlan <numero> (ou em interface: no shutdown)")
+            return
+        self.comando_errado("% no is only allowed in configuration mode.")
 
     def ac_ip(self, partes):
         d = self.atual
@@ -1615,6 +1769,52 @@ class TerminalGame:
         d = self.atual
         if d["modo"] != "priv":
             self.comando_errado("% simular is only allowed in privileged mode.")
+            return
+        if self.mid == "m5":
+            print()
+            print(cr("== SIMULANDO TRAFEGO LAYER 2 ==", "bold"))
+            p = d.interfaces.get("fa0/1")
+            if not (p and p["mode"] == "access" and p["access_vlan"] == 10):
+                print(cr("  PC da sala B   : nao sobe. A porta esta como "
+                         + ("trunk!" if p and p["mode"] == "trunk" else "errada."), "red"))
+                print(cr("  (porta de escritorio precisa ser access VLAN 10)", "dim"))
+            else:
+                print(cr("  PC da sala B   : CONECTOU na VLAN 10 (access)", "green"))
+            if d.trunk_carrega(10):
+                print(cr("  Uplink SW      : leva a VLAN 10 ate o nucleo", "green"))
+            else:
+                print(cr("  Uplink SW      : nao libera a VLAN 10 (confira o trunk fa0/24)", "red"))
+            print()
+            if (p and p["mode"] == "access" and p["access_vlan"] == 10) and d.trunk_carrega(10):
+                d.trafego_ok = True
+                print(cr("Trunk na ordem: PC da sala conversa com o nucleo. E o Valente dorme.", "green"))
+                self.jogo.ganha_xp(50, "teste de trafego concluido")
+            else:
+                print(cr("Ainda nao: porta do PC e/ou uplink estao no lugar errado.", "yellow"))
+            return
+        if self.mid == "m6":
+            print()
+            print(cr("== SIMULANDO TRAFEGO DO TRUNK ==", "bold"))
+            if d.trunk_carrega(10, 20):
+                print(cr("  VLAN 20 (RH) : atravessou o trunk e chegou na TI", "green"))
+            else:
+                print(cr("  VLAN 20 (RH) : se perdeu no meio do caminho (allowed vlan sem 20)", "red"))
+            if d.native_vlan() == 99:
+                print(cr("  Native 99    : trafego sem tag nao vaza e nao mistura", "green"))
+            else:
+                print(cr("  Native      : errada! Frames sem tag vao parar na VLAN errada.", "red"))
+                print(cr("  (padrao da DC Corp: switchport trunk native vlan 99)", "dim"))
+            if 999 in d.vlans:
+                print(cr("  FANTASMA 999 : broadcast fantasma perambulando no link!", "red"))
+            else:
+                print(cr("  FANTASMA     : nenhuma VLAN sem dono. Limpeza concluida.", "green"))
+            print()
+            if d.trunk_carrega(10, 20) and d.native_vlan() == 99 and 999 not in d.vlans:
+                d.trafego_ok = True
+                print(cr("Link saudavel: so as VLANs 10 e 20 passam, sem fantasma. Missao de layer 2.", "green"))
+                self.jogo.ganha_xp(50, "teste de trafego concluido")
+            else:
+                print(cr("Trunk ainda meio suja: allowed, native e/ou a fantasma 999.", "yellow"))
             return
         num_acl = d.acl_aplicada("fa0/1", "in")
         regras = d.acl_listas.get(num_acl, [])
@@ -1867,9 +2067,19 @@ class TerminalGame:
             print(cr('  (A Janaina deu o polegar por tras da porta.)', "dim"))
         elif self.mid == "m4":
             print(cr('Janaina: "Muro de pe. O RH nao decola mais na Diretoria e o', "magenta"))
-            print(cr('  gato do Valente costurou o link do TI sem cerol. ACL na veia."', "magenta"))
+            print(cr('  gato do Valente costurou o link do TI sem cerol. ACL na veia.', "magenta"))
             print(cr('  So falta voce me garantir a proxima."', "magenta"))
             print(cr('  (No painel dela, o contador da sua deny sobe: 1 batida.)', "dim"))
+        elif self.mid == "m5":
+            print(cr('Janaina: "Porta de PC com VLAN de andar, uplink no modo certo.', "magenta"))
+            print(cr('  Voce achou a bagunca de layer 2 sozinho, sem eu dar a mao.', "magenta"))
+            print(cr('  E o povo que tava no ``no ar``? Ta de volta. Bom sinal."', "magenta"))
+            print(cr('  (A Janaina anotou no caderninho dela: RESPONDEU SOZINHO.)', "dim"))
+        elif self.mid == "m6":
+            print(cr('Janaina: "Allowed vlan enxuto, nativa padrao, fantasma virou po.', "magenta"))
+            print(cr('  Quando a VLAN 20 sair do RH e chegar na TI inteira, sabe', "magenta"))
+            print(cr('  de quem vai ser o merito? Da config. E de quem configurou? Seu."', "magenta"))
+            print(cr('  (E o aposento do Sr. Valente voltou a ter silencio.)', "dim"))
         print()
         print(cr("Voltando a central de operacoes...", "dim"))
         if self.jogo.salvar():
