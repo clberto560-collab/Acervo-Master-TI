@@ -11,11 +11,12 @@ O DETONADO (opcao 3) e o guia passo a passo de cada missao.
 
 Requires: Python 3 (sem dependencias externas).
 """
-
 import json
+
 import os
 import sys
 import time
+import ast
 
 if os.name == "nt":
     os.system("")  # habilita cores ANSI no terminal Windows
@@ -367,19 +368,31 @@ MISSOES = {
     "m7": {
         "id": "m7",
         "capitulo": 7,
-        "titulo": "Visao de Coruja",
-        "estado": 2,
-        "lv": 7,
-        "npc": "Dra. Santos (Seguranca)",
-        "ambientacao": "A infra cresceu e ninguem enxerga mais o que acontece nos servidores.",
-        "objetivo": "Implantar monitoramento de logs (Wazuh) e detectar eventos suspeitos.",
-        "aprender": "SIEM basico, coleta de logs, alertas e resposta a incidente.",
+        "titulo": "Primeiro Script (Python)",
+        "estado": 1,
+        "lv": 5,
+        "npc": "Supervisora Janaina Lopes",
+        "ambientacao": "Janaina cansou de digitar config na mao. Ela abre um terminal diferente no painel dela e te manda a missao mais estranha ate aqui: escrever codigo Python.",
+        "objetivo": "No terminal Python (>>>), escrever um script de boas-vindas: usar print, criar variaveis e imprimi-las (variavel empresa = 'DC Corp' e andar = 15).",
+        "aprender": "Python do zero: print(), variaveis, texto e numero, concatencao.",
         "recompensa": 1500,
+        "cena_intro": [
+            'JANAINA gira o monitor pro teu lado. Tem um terminal estranho:',
+            '"Chega de ligar config na mao pra cada maquina. Automacao,',
+            '  estagiario. Vai comecar no zero: esse terminal aqui e Python.',
+            '  Escreve um script de boas-vindas: usa print, cria variavel,',
+            '  imprime a empresa e o andar. Do lado tem o DETONADO se perder."',
+            '(Ela aponta pra um lembrete grudado no monitor:',
+            '  texto vai entre aspas. Numero nao.)',
+        ],
         "guia": [
-            "1) Instalar e configurar o agente de monitoramento.",
-            "2) Coletar logs de autenticacao de um servidor.",
-            "3) Detectar uma tentativa de acesso suspeita.",
-            "4) Documentar o incidente do inicio ao fim.",
+            "1) De as boas-vindas: digite  print(\"Bem vindo a DC Corp\")",
+            "2) Crie uma variavel:  empresa = \"DC Corp\"",
+            "3) Imprima a variavel:  print(\"A casa e a \", empresa)",
+            "4) Crie o andar:  andar = 15",
+            "5) Imprima:  print(andar)",
+            "6) Confira o progresso:  progresso",
+            "7) Concluiu? O jogo avisa e salva. (comandos: help, dica, missao)",
         ],
     },
     "m8": {
@@ -713,6 +726,7 @@ TRILHA = [
                  ("zb1-2", "Trigger de alerta", "criar alerta de CPU e interface"),
                  ("zb1-3", "Painel do Valente", "dashboard mostrando os andares em tempo real"),
                  ("zb1-4", "Auto-discovery", "varredura que acha os hosts sozinha"),
+                 ("zb1-5", "O vigia de logs", "SIEM simples: ver eventos suspeitos e responder"),
              ])},
         ],
     },
@@ -735,7 +749,7 @@ TRILHA = [
         "topicos": [
             {"nome": "Python do Zero", "horas": 24, "requer": ["Modelo OSI"],
              "missoes": _mis([
-                 ("pr1-1", "Primeiro script", "print, variaveis e o primeiro codigo do estagiario"),
+                 ("m7", "Primeiro script", "print, variaveis e o primeiro codigo do estagiario"),
                  ("pr1-2", "Decisoes e lacos", "if e for varrendo a lista de IPs da DC"),
                  ("pr1-3", "Funcoes do dia a dia", "funcoes que checam conectividade de um equipamento"),
              ])},
@@ -991,6 +1005,14 @@ class TerminalGame:
         self.jogo = jogo
         self.mid = mid
         self.missao = m
+        self.tipo_python = mid == "m7"
+        self.pv = {}
+        self.py_saidas = []
+        self.py_print_count = 0
+        if self.tipo_python:
+            self.devices = {}
+            self.atual = None
+            return
 
         def base_interface(up=True):
             return {"mode": "access", "access_vlan": 1, "trunk_allowed": None, "ip": None, "up": up,
@@ -1054,6 +1076,8 @@ class TerminalGame:
     # ---- infos de apresentacao ----
 
     def prompt(self):
+        if self.tipo_python:
+            return cr(">>>", "cyan")
         d = self.atual
         modos = {
             "user": f"{d.hostname}>",
@@ -1066,6 +1090,20 @@ class TerminalGame:
 
     def ver_progresso(self):
         linhas = [cr(f"== PROGRESSO DA MISSAO (capitulo {self.missao['capitulo']}) ==", "bold")]
+        if self.tipo_python:
+            self._py_metas()
+            for meta, texto in [
+                ("g_print", "rodou um print de boas-vindas"),
+                ("g_empresa", "variavel empresa = 'DC Corp'"),
+                ("g_emp_out", "imprimiu a empresa (saiu 'DC Corp' na tela)"),
+                ("g_andar", "variavel andar = 15 e imprimiu"),
+            ]:
+                marca = cr("OK", "green") if self.pv.get(meta) else cr("FALTA", "yellow")
+                linhas.append(f"  {marca}  {texto}")
+            linhas.append(cr("  Dica: texto entre aspas; numero sem aspas. print(...) mostra na tela.", "dim"))
+            linhas.append("  -> " + (cr("TODAS AS METAS CUMPRIDAS", "green") if self._python_ok()
+                                     else cr("ainda nao concluiu", "yellow")))
+            return "\n".join(linhas)
         for cod, d in self.devices.items():
             requisitos = []
             if self.mid == "m1":
@@ -1150,6 +1188,17 @@ class TerminalGame:
         return "\n".join(linhas)
 
     def dica(self):
+        if self.tipo_python:
+            self._py_metas()
+            if not self.pv.get("g_print"):
+                return 'Comece dando as boas-vindas:  print("Bem vindo a DC Corp")'
+            if not self.pv.get("g_empresa"):
+                return 'Crie a variavel:  empresa = "DC Corp"'
+            if not self.pv.get("g_emp_out"):
+                return 'Imprima a variavel:  print("A casa e a ", empresa)'
+            if not self.pv.get("g_andar"):
+                return "Crie e imprima o numero:  andar = 15  e depois  print(andar)"
+            return "Tudo pronto. Confira com:  progresso"
         d = self.atual
         if d["modo"] == "user":
             return "Entre no modo privilegiado: enable"
@@ -1220,6 +1269,18 @@ class TerminalGame:
         return "Digite help para ver comandos."
 
     def help_tela(self):
+        if self.tipo_python:
+            return "\n".join([
+                cr("== TERMINAL PYTHON (>>>) ==", "bold"),
+                "  print(...)                mostra algo na tela",
+                "  variavel = valor          guarda um valor",
+                "  Ex.: empresa = \"DC Corp\"  (texto entre aspas)",
+                "  Ex.: andar = 15            (numero, sem aspas)",
+                "  print(empresa)            imprime o valor guardado",
+                "  # comentario              nao faz nada",
+                "  missao / progresso / detonado / dica",
+                "  help / sair",
+            ])
         d = self.atual
         eh_router = d.kind == "router"
         if d["modo"] == "user":
@@ -1910,9 +1971,151 @@ class TerminalGame:
         else:
             self.comando_errado("% Host desconhecido. Disponiveis: " + ", ".join(self.devices))
 
+    # ---- modo python (camada 1: do zero) ----
+
+    def _py_split_top(self, texto, sep):
+        partes, atual, prof, dentro = [], "", 0, None
+        for ch in texto:
+            if dentro is not None:
+                atual += ch
+                if ch == dentro:
+                    dentro = None
+                continue
+            if ch in ("'", '"'):
+                dentro, atual = ch, atual + ch
+            elif ch == "(":
+                prof, atual = prof + 1, atual + ch
+            elif ch == ")":
+                prof, atual = max(0, prof - 1), atual + ch
+            elif ch == sep and prof == 0:
+                partes.append(atual.strip())
+                atual = ""
+            else:
+                atual += ch
+        partes.append(atual.strip())
+        return partes
+
+    def _py_val(self, expr):
+        e = expr.strip()
+        if e == "":
+            return None
+        if e in self.pv:
+            return self.pv[e]
+        if e.startswith(("str(", "int(")) and e.endswith(")"):
+            arg = self._py_val(e[4:-1])
+            if arg is None:
+                return None
+            return str(arg) if e.startswith("str(") else (int(arg) if isinstance(arg, (int, float)) else None)
+        try:
+            return ast.literal_eval(e)
+        except Exception:
+            pass
+        partes = self._py_split_top(e, "+")
+        if len(partes) > 1:
+            vals = [self._py_val(p) for p in partes]
+            if any(v is None for v in vals):
+                return None
+            if any(isinstance(v, str) for v in vals):
+                return "".join(str(v) for v in vals)
+            try:
+                return sum(vals)
+            except TypeError:
+                return None
+        return None
+
+    def _py_metas(self):
+        saida_juntas = " ".join(self.py_saidas).lower()
+        self.pv["g_print"] = bool(self.py_print_count)
+        emp = self.pv.get("empresa")
+        self.pv["g_empresa"] = isinstance(emp, str) and emp.lower() == "dc corp"
+        self.pv["g_emp_out"] = self.pv["g_empresa"] and "dc corp" in saida_juntas
+        andar = self.pv.get("andar")
+        self.pv["g_andar"] = andar == 15 and "15" in saida_juntas
+
+    def _python_ok(self):
+        self._py_metas()
+        return bool(self.pv.get("g_print") and self.pv.get("g_empresa")
+                    and self.pv.get("g_emp_out") and self.pv.get("g_andar"))
+
+    def _python_roda(self, linha):
+        linha = linha.strip()
+        if not linha or linha.startswith("#"):
+            return ""
+        codigo = linha.split(" #", 1)[0].rstrip()
+        if codigo.startswith("print"):
+            arg = codigo[len("print"):].strip()
+            if not (arg.startswith("(") and arg.endswith(")")):
+                return cr('SyntaxError: use print(...)', "red")
+            args = self._py_split_top(arg[1:-1], ",")
+            if args == [""]:
+                args = []
+            vals = []
+            for a in args:
+                v = self._py_val(a)
+                if v is None:
+                    return cr(f"NameError: name {a!r} nao esta definido", "red")
+                vals.append(v)
+            texto = " ".join(str(v) for v in vals)
+            self.py_saidas.append(texto)
+            self.py_print_count += 1
+            if self.py_print_count == 1:
+                self.jogo.ganha_xp(25, "primeiro print")
+            return texto
+        if "=" in codigo:
+            nome, _, expr = codigo.partition("=")
+            nome = nome.strip()
+            expr = expr.strip()
+            if not nome or not nome.isidentifier():
+                return cr("SyntaxError: nome de variavel invalido", "red")
+            v = self._py_val(expr)
+            if v is None:
+                return cr(f"NameError: {expr!r} nao e um valor que ensinamos (nesta aula)", "red")
+            self.pv[nome] = v
+            self.jogo.ganha_xp(10, f"variavel {nome} criada")
+            return cr(f"{nome} = {v!r}", "dim")
+        return cr('SyntaxError: so ensinamos nesta aula: print(...) e  variavel = valor', "red")
+
+    def _jogar_python(self):
+        print()
+        motd([(linha, "magenta") for linha in self.missao["cena_intro"]])
+        print()
+        print(cr("Terminal Python aberto (>>>). Digite help para os comandos.", "green"))
+        print()
+        while True:
+            linha = ler(self.prompt() + " ")
+            if linha in ("eof",):
+                break
+            if not linha:
+                continue
+            cmd = linha.strip().lower()
+            if cmd in ("sair", "quit"):
+                break
+            if cmd == "help":
+                print(self.help_tela())
+            elif cmd == "missao":
+                print(objetivo_da_missao(self.jogo, self.mid))
+            elif cmd == "progresso":
+                print(self.ver_progresso())
+            elif cmd == "detonado":
+                print(mostrar_detonado(self.jogo, self.missao["capitulo"]))
+            elif cmd == "dica":
+                print(self.dica())
+            elif cmd in ("trilha", "jornada"):
+                print(texto_trilha(self.jogo))
+            else:
+                saida = self._python_roda(linha)
+                if saida:
+                    print(saida)
+            if self.venceu():
+                self.fim_da_missao()
+                return
+
     # ---- loop ----
 
     def jogar(self):
+        if self.tipo_python:
+            self._jogar_python()
+            return
         print()
         motd([(linha, "magenta") for linha in self.missao["cena_intro"]])
         print()
@@ -2041,6 +2244,8 @@ class TerminalGame:
         return "\n".join(linhas)
 
     def venceu(self):
+        if self.tipo_python:
+            return self._python_ok()
         return all(checar_missao(self.mid, d) for d in self.devices.values())
 
     def fim_da_missao(self):
@@ -2080,6 +2285,11 @@ class TerminalGame:
             print(cr('  Quando a VLAN 20 sair do RH e chegar na TI inteira, sabe', "magenta"))
             print(cr('  de quem vai ser o merito? Da config. E de quem configurou? Seu."', "magenta"))
             print(cr('  (E o aposento do Sr. Valente voltou a ter silencio.)', "dim"))
+        elif self.mid == "m7":
+            print(cr('Janaina: "PRINT. VARIAVEL. IMPRIMIU. Automatico de verdade.', "magenta"))
+            print(cr('  Esse par de maos aqui nasceu pra codar, estagiario. Amanha', "magenta"))
+            print(cr('  a gente joga esse script no bagulho que liga a rede sozinha."', "magenta"))
+            print(cr('  (Ela tira o lembrete do monitor. Ela acha que voce aprendeu.)', "dim"))
         print()
         print(cr("Voltando a central de operacoes...", "dim"))
         if self.jogo.salvar():

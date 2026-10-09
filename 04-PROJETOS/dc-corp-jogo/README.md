@@ -52,7 +52,7 @@ Uma passada visual por cima do mesmo jogo:
 | 4 | O Muro da Empresa (JOGAVEL) | 4 | Firewall/ACL, contadores |
 | 5 | Trunk ou Access Trocado (JOGAVEL) | 5 | Porta access vs trunk, diagnosticar layer 2 |
 | 6 | A VLAN Fantasma (JOGAVEL) | 6 | Allowed vlan, VLAN nativa, remover VLAN fantasma |
-| 7 | Visao de Coruja | 7 | Wazuh/SIEM, resposta |
+| 7 | Primeiro Script (Python) (JOGAVEL) | 5 | Python do zero: print, variaveis, texto e numero |
 | 8 | A Infra que se Configura Sozinha | 8 | Python+Netmiko, Ansible |
 | 9 | O Defensor Final | 9 | Defesa completa (red team simulado) |
 
@@ -79,13 +79,13 @@ As fases (ordem da empresa, tal qual a Jornada):
 7. **DataCenter** - o desfecho: consolidar a DC Corp num data center de verdade.
 8. **Programacao** - transversal: Python ensina a infra a se configurar sozinha.
 
-> Ex.: o topico *Switches Ethernet - Parte I* ja e jogavel (VLAN + trunk nas missoes 1-2) e ganha mais situacoes (access/trunk trocado, VLAN fantasma) no roadmap.
+> Ex.: o topico *Switches Ethernet - Parte I* ja e jogavel (missoes 1-2: VLAN + trunk; missoes 5-6: access/trunk trocado e VLAN fantasma) e *Python do Zero* acaba de ganhar a primeira situacao jogavel (cap. 7).
 
 ## O Detonado
 
 Dentro do jogo, opcao **3** mostra o guia passo a passo de cada missao (quem passa, cenario, objetivo, o que aprende, recompensa e os passos exatos). Tambem da pra acessar por capitulo: `detonado 2`.
 
-## Gameplay atual (Capitulos 1, 2, 3, 4, 5 e 6)
+## Gameplay atual (Capitulos 1 ao 7)
 
 Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas proximas missoes):
 
@@ -105,6 +105,14 @@ Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas pr
 - `conectar <host>` (trocar equipamento) — `show switches` lista os hosts
 - `help` / `dica` / `missao` / `progresso` / `detonado`
 - `ping 8.8.8.8` (prova da missao 3: diagnostica LAN -> rota -> NAT)
+
+**Capitulo 7 abre o terminal Python (>>>)** — o estagiario comeca a automatizar. Interpretador didatico (seguro, sem exec de codigo arbitrario) que por enquanto ensina a base:
+
+- `print("texto")` — mostra algo na tela (texto entre aspas)
+- `variavel = valor` — guarda um valor: `empresa = "DC Corp"` (texto) ou `andar = 15` (numero)
+- `print(empresa)` — imprime o valor guardado
+- `# comentario` — nao faz nada
+- `progresso` mostra as metas da aula (print de boas-vindas, variavel empresa, imprimir a empresa, andar 15)
 - `simular trafego` (prova das missoes 4, 5 e 6: testa ACL / access x trunk / trunk e fantasma)
 
 **Capitulo 1** (O Primeiro Dia): recriar a VLAN 10 (TI) nos dois switches e salvar.
