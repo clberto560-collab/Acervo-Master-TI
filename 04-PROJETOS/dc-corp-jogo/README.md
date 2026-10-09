@@ -62,10 +62,24 @@ Uma passada visual por cima do mesmo jogo:
 
 No menu da Central, opcao **5** (ou o comando `trilha` dentro do terminal, e o botao **TRILHA** no Modo Historia) mostra a **JORNADA**: todo o mapa de estudo do Acervo Master TI virou trilha de missoes, organizada por tema.
 
-- **Tema** = um mundo (Redes, Cabeamento, Mikrotik, Ubiquiti, Huawei, Zabbix, DataCenter).
-- **Topico** = uma trilha de missoes; os que ja tem gameplay aparecem como **JOGAVEL** e ficam **CONCLUIDO** quando as missoes ligadas forem vencidas. O resto vem **EM BREVE**.
+- **Tema** = um mundo, com uma **fase da empresa por tras** (o enredo explica por que se aprende aquilo ali).
+- **Topico** = uma trilha de missoes. Cada topico tem **varias missoes/situacoes** (nao so uma): cada uma e um problema que acontece na DC Corp.
+- **Pre-requisito = destravar**: `(primeiro: <topico>)` aparece em todo topico que exige base. A ideia e exatamente que **cada trilha puxa a outra no conhecimento**.
+- Badges: **JOGAVEL** (tem terminal funcionando), **CONCLUIDA** (voce venceu), **EM BREVE** (ja esta no roadmap).
 - Horas de curso viram **XP de meta** (1h = 100 XP), pra "estudei no mundo real" bater com "subi no jogo".
-- Ex.: o topico *Switches Ethernet - Parte I* e jogavel hoje (missoes 1-2: VLAN + trunk), *Roteamento IP e RIP* e *NAT, Proxy e BGP* tambem (missao 3).
+
+As fases (ordem da empresa, tal qual a Jornada):
+
+1. **Redes** - o estagiario ressuscita a rede velha dos andares (o que ja jogamos).
+2. **Cabeamento** - crescer exige casa arrumada: par metalico certificado, depois fibra. Ninguem monta Mikrotik em cabo solto.
+3. **Mikrotik** - com a infra pronta, chega o roteador de borda que o Valente comprou.
+4. **Ubiquiti** - Wi-Fi pra firma inteira, em cima da fibra ja certificada.
+5. **Huawei** - o contrato grande exige padrao enterprise: a DC Corp vira provedora.
+6. **Zabbix** - tudo no ar, agora ninguem dorme: monitoramento 24h.
+7. **DataCenter** - o desfecho: consolidar a DC Corp num data center de verdade.
+8. **Programacao** - transversal: Python ensina a infra a se configurar sozinha.
+
+> Ex.: o topico *Switches Ethernet - Parte I* ja e jogavel (VLAN + trunk nas missoes 1-2) e ganha mais situacoes (access/trunk trocado, VLAN fantasma) no roadmap.
 
 ## O Detonado
 

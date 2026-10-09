@@ -433,112 +433,372 @@ def mapa_missoes(jogo):
 # ---------------------------------------------------------------------------
 # JORNADA DE APRENDIZADO (espelha o Acervo Master TI)
 # ---------------------------------------------------------------------------
-# Cada "tema" e um mundo; cada topico e uma trilha de missoes no jogo.
-# As missoes jogaveis atuais sao vinculadas aos topicos equivalentes.
-# ""missoes"" vazio => topico ainda nao tem gameplay (EM BREVE).
+# Cada "tema" e um mundo (fase da empresa); cada topico e uma trilha de
+# MISSOES. Uma missao tem "id" (usado pela engine), "titulo" e "situacao".
+# ids "m1".."m9" = missoes com engine (JOGAVEL/CONCLUIDA); ids novos sem
+# engine (ex: "r1-1") sao o roadmap -> EM BREVE. "requer" = pre-requisito:
+# voce so destrava o proximo topico (e a proxima fase da empresa) com a base.
+# Cada trilha puxa a proxima: a DC Corp cresce na ordem abaixo.
+
+def _mis(seq):
+    return [{"id": i, "titulo": t, "situacao": s} for i, t, s in seq]
 
 TRILHA = [
     {
         "tema": "Redes",
+        "fase": "O estagiario ressuscita a rede velha da DC Corp, andar por andar.",
         "topicos": [
-            {"nome": "Modelo OSI", "horas": 8, "missoes": []},
-            {"nome": "Protocolo TCP/IP", "horas": 8, "missoes": []},
-            {"nome": "Protocolo IPv4 e Classes", "horas": 6, "missoes": []},
-            {"nome": "IPv4: Sub-Redes, VLSM e CIDR", "horas": 12, "missoes": []},
-            {"nome": "Dispositivos e Topologias de Rede", "horas": 8, "missoes": []},
-            {"nome": "Clientes de Rede", "horas": 2, "missoes": []},
-            {"nome": "Protocolos e Servicos de Rede", "horas": 8, "missoes": []},
-            {"nome": "Switches Ethernet - Parte I", "horas": 10, "missoes": ["m1", "m2"]},
-            {"nome": "Switches Ethernet - Parte II", "horas": 10, "missoes": []},
-            {"nome": "Protocolo Spanning Tree de A a Z", "horas": 10, "missoes": []},
-            {"nome": "Roteamento IP e RIP", "horas": 6, "missoes": ["m3"]},
-            {"nome": "Internet - NAT, Proxy e BGP", "horas": 4, "missoes": ["m3"]},
-            {"nome": "Wireless LAN (Redes sem fio)", "horas": 8, "missoes": []},
-            {"nome": "Network Troubleshooting", "horas": 6, "missoes": []},
+            {"nome": "Modelo OSI", "horas": 8, "requer": [],
+             "missoes": _mis([
+                 ("r1-1", "O cabo no lugar errado", "um andar inteiro nao comunica: achar em qual camada o problema mora"),
+                 ("r1-2", "A culpa e de quem", "navega na web mas nao chega no servidor interno: separar as camadas"),
+                 ("r1-3", "Checklist de camadas", "usar as 7 camadas como roteiro de diagnostico"),
+             ])},
+            {"nome": "Protocolo TCP/IP", "horas": 8, "requer": ["Modelo OSI"],
+             "missoes": _mis([
+                 ("r2-1", "TCP ou UDP?", "o streaming da recepcao trava: escolher o transporte certo para cada servico"),
+                 ("r2-2", "Os tres apertos", "conexao que nao abre: entender o handshake SYN/ACK no terminal"),
+                 ("r2-3", "Mapa de portas", "mapear quais servicos e portas a DC Corp usa"),
+             ])},
+            {"nome": "Protocolo IPv4 e Classes", "horas": 6, "requer": ["Protocolo TCP/IP"],
+             "missoes": _mis([
+                 ("r3-1", "Enderecos sem padrao", "organizar os IPs da empresa por classe (A, B, C)"),
+                 ("r3-2", "O IP repetido", "duas maquinas com o mesmo endereco: resolver o conflito"),
+                 ("r3-3", "Rede, host ou gateway?", "decidir quando a resposta e local ou vai para o default gateway"),
+             ])},
+            {"nome": "IPv4: Sub-Redes, VLSM e CIDR", "horas": 12, "requer": ["Protocolo IPv4 e Classes"],
+             "missoes": _mis([
+                 ("r4-1", "Dividindo em pedacinhos", "quebrar a rede da Diretoria em sub-redes de tamanhos iguais"),
+                 ("r4-2", "VLSM na mao", "sub-redes sob medida, cada setor com o tamanho certo"),
+                 ("r4-3", "CIDR na pratica", "enxugar a tabela de rotas usando notacao /CIDR"),
+             ])},
+            {"nome": "Dispositivos e Topologias de Rede", "horas": 8, "requer": ["IPv4: Sub-Redes, VLSM e CIDR"],
+             "missoes": _mis([
+                 ("r5-1", "Qual equipamento resolve?", "escolher o aparelho certo (switch, roteador, AP) para cada situacao"),
+                 ("r5-2", "Topologia do andar 15", "organizar estrela e malha no predio"),
+                 ("r5-3", "Caminho reserva", "preparar um segundo link de emergencia para o almoxarifado"),
+             ])},
+            {"nome": "Clientes de Rede", "horas": 2, "requer": ["Dispositivos e Topologias de Rede"],
+             "missoes": _mis([
+                 ("r6-1", "O PC sem internet", "validar IP, mascara, gateway e DNS do cliente"),
+                 ("r6-2", "Cliente DNS travado", "corrigir a resolucao de nomes de uma maquina"),
+             ])},
+            {"nome": "Protocolos e Servicos de Rede", "horas": 8, "requer": ["Protocolo TCP/IP"],
+             "missoes": _mis([
+                 ("r7-1", "Servicos em ordem", "subir e enxergar DHCP, DNS, HTTP e FTP na rede certa"),
+                 ("r7-2", "Portas e protocolos", "liberar no firewall o servico que a firma precisa"),
+                 ("r7-3", "O vizinho ARP", "resolver erros de ARP no cenario da DC"),
+             ])},
+            {"nome": "Switches Ethernet - Parte I", "horas": 10,
+             "requer": ["Dispositivos e Topologias de Rede", "Protocolos e Servicos de Rede"],
+             "missoes": _mis([
+                 ("m1", "VLAN na mao, porta a porta", "diagramar as VLANs da DC Corp e configurar porta por porta"),
+                 ("m2", "Trunk entre os andares", "estender as VLANs entre os switches com tres eietiqueta 802.1Q"),
+                 ("r8-3", "Access ou trunk trocado", "usa deu certo mas a porta errada vazou a VLAN para o desktop"),
+                 ("r8-4", "VLAN fantasma", "auditar a config: a VLAN nativa do trunk conta conversa cruzada"),
+             ])},
+            {"nome": "Switches Ethernet - Parte II", "horas": 10, "requer": ["Switches Ethernet - Parte I"],
+             "missoes": _mis([
+                 ("r9-1", "Tag e untag", "desenhar como o 802.1Q marca e desmarca os frames no trunk"),
+                 ("r9-2", "VLAN permitida demais", "enxugar as allowed vlan do trunk que trafega lixo"),
+                 ("r9-3", "Porta de acesso blindada", "aplicar port security nas portas de acesso"),
+             ])},
+            {"nome": "Protocolo Spanning Tree de A a Z", "horas": 10,
+             "requer": ["Switches Ethernet - Parte II"],
+             "missoes": _mis([
+                 ("r10-1", "O laco fatal", "dois cabos unindo os switches formam um loop de broadcast: ativar o STP"),
+                 ("r10-2", "Quem manda?", "escolher a root bridge certa da rede"),
+                 ("r10-3", "Porta bloqueada de proposito", "entender os papeis das portas (root, designated, blocked)"),
+             ])},
+            {"nome": "Roteamento IP e RIP", "horas": 6,
+             "requer": ["IPv4: Sub-Redes, VLSM e CIDR"],
+             "missoes": _mis([
+                 ("m3", "Estradas da DC Corp", "rotas estaticas e NAT/PAT para a empresa se comunicar"),
+                 ("r11-2", "A rota sumiu", "o ping para de funcionar: achar a rota estatica errada"),
+                 ("r11-3", "RIP na pratica", "subir o RIP entre os roteadores e ver as rotas aprenderem sozinhas"),
+             ])},
+            {"nome": "Internet - NAT, Proxy e BGP", "horas": 4,
+             "requer": ["Roteamento IP e RIP"],
+             "missoes": _mis([
+                 ("m4", "O Muro da Empresa", "ACL e firewall controlando quem fala com quem na borda"),
+                 ("r12-2", "PAT esgotando", "muitos PCs, um IP de saida: fazer o overload dar conta"),
+                 ("r12-3", "Proxy na manga", "implantar proxy/cache para economizar o link"),
+                 ("r12-4", "O vizinho BGP", "fazer o peering com o provedor de internet"),
+             ])},
+            {"nome": "Wireless LAN (Redes sem fio)", "horas": 8,
+             "requer": ["Protocolos e Servicos de Rede", "Clientes de Rede"],
+             "missoes": _mis([
+                 ("r13-1", "Wi-Fi sem nome", "configurar SSID e seguranca do acesso sem fio"),
+                 ("r13-2", "O canto sem sinal", "escolher canal e posicao dos APs para cobrir o predio"),
+                 ("r13-3", "Convidado do lado de fora", "rede de visitantes isolada em VLAN proprio"),
+             ])},
+            {"nome": "Network Troubleshooting", "horas": 6,
+             "requer": ["Protocolos e Servicos de Rede", "Roteamento IP e RIP"],
+             "missoes": _mis([
+                 ("r14-1", "O andar 15 caiu", "diagnostico guiado: ping, traceroute, ARP ate achar o problema"),
+                 ("r14-2", "Lentidao misteriosa", "caca ao gargalo que ninguem acha"),
+                 ("r14-3", "Caos documentado", "padronizar as configs para o proximo estagiario sobreviver"),
+             ])},
         ],
     },
     {
         "tema": "Cabeamento",
+        "fase": "A DC Corp cresceu: antes de equipamento novo, a casa fica arrumada.",
         "topicos": [
-            {"nome": "Cabeamento Estruturado Metalico", "horas": 16, "missoes": []},
-            {"nome": "Cabeamento Estruturado Fibra", "horas": 16, "missoes": []},
-            {"nome": "Cabeamento Profissional", "horas": 24, "missoes": []},
-            {"nome": "Cabeamento - Gestao de Equipe", "horas": 16, "missoes": []},
-            {"nome": "Certificacao de Enlaces em Par Metalico", "horas": 16, "missoes": []},
-            {"nome": "Cabos de Fibra Optica (caracteristicas)", "horas": 16, "missoes": []},
-            {"nome": "Certificacao de Enlaces Opticos (Tier 1)", "horas": 16, "missoes": []},
-            {"nome": "Teste de Enlaces Opticos com OTDR", "horas": 16, "missoes": []},
-            {"nome": "Orcamento de Perda e Potencia Optica", "horas": 16, "missoes": []},
-            {"nome": "Taxa de Ocupacao de Caminhos", "horas": 16, "missoes": []},
-            {"nome": "Pratica com Tecnologia em Fibra Optica", "horas": 8, "missoes": []},
+            {"nome": "Cabeamento Estruturado Metalico", "horas": 16, "requer": ["Modelo OSI"],
+             "missoes": _mis([
+                 ("c1-1", "Do rack ao patch panel", "roteirizar o cabo de cada posto ate o painel certo"),
+                 ("c1-2", "Panel desorganizado", "achar e patchar o ponto fisico certo de cada sala"),
+                 ("c1-3", "Norma em dia", "escolher o cabo certo (CAT5e/6) e respeitando a norma"),
+             ])},
+            {"nome": "Cabeamento Estruturado Fibra", "horas": 16,
+             "requer": ["Cabeamento Estruturado Metalico"],
+             "missoes": _mis([
+                 ("c2-1", "Fibra entre predios", "subir o backbone de fibra ligando os dois predios"),
+                 ("c2-2", "Emendas e conectores", "emendar e conectar a fibra no ponto certo"),
+                 ("c2-3", "Padrao TIA/ANSI", "organizar o projeto segundo a norma de infraestrutura"),
+             ])},
+            {"nome": "Cabeamento Profissional", "horas": 24, "requer": ["Cabeamento Estruturado Fibra"],
+             "missoes": _mis([
+                 ("c3-1", "A casa de cabos perfeita", "organizar racks, dutos e identificacao do DSO"),
+                 ("c3-2", "A arte do patch", "padrao de cores e criado-cruzado sob controle"),
+                 ("c3-3", "Caminho limpo", "evitar interferencia e entupimento nos caminhos de cabos"),
+             ])},
+            {"nome": "Cabeamento - Gestao de Equipe", "horas": 16, "requer": ["Cabeamento Profissional"],
+             "missoes": _mis([
+                 ("c4-1", "Time no ritmo", "dividir a obra entre os pontos e prazos"),
+                 ("c4-2", "O ponto perdido", "liderar a busca do ponto errado sem estourar o prazo"),
+                 ("c4-3", "Padrao pra equipe", "criar um procedimento que ate o novato segue"),
+             ])},
+            {"nome": "Certificacao de Enlaces em Par Metalico", "horas": 16,
+             "requer": ["Cabeamento Estruturado Metalico"],
+             "missoes": _mis([
+                 ("c5-1", "O testador acusou", "enlace que nao certifica: crosstalk e comprimento fora"),
+                 ("c5-2", "Lendo o relatorio", "interpretar o laudo do certificador de par metalico"),
+                 ("c5-3", "Do FAIL ao PASS", "corrigir o que reprovou e re-testar ate certificar"),
+             ])},
+            {"nome": "Cabos de Fibra Optica (caracteristicas)", "horas": 16,
+             "requer": ["Cabeamento Estruturado Fibra"],
+             "missoes": _mis([
+                 ("c6-1", "Monomodo ou multimodo?", "escolher a fibra certa para cada distancia"),
+                 ("c6-2", "Conectores e cores", "identificar LC/SC e os padroes de cor dos conectores"),
+                 ("c6-3", "Perda que faz sentido", "entender atenuacao em dB por quilometro"),
+             ])},
+            {"nome": "Certificacao de Enlaces Opticos (Tier 1)", "horas": 16,
+             "requer": ["Cabos de Fibra Optica (caracteristicas)"],
+             "missoes": _mis([
+                 ("c7-1", "Teste Tier 1", "certificar o enlace optico no padrao"),
+                 ("c7-2", "O resultado estranho", "interpretar perda e reflexao do laudo"),
+                 ("c7-3", "Passa ou reprova?", "decidir com a potencia medida se o enlace esta aprovado"),
+             ])},
+            {"nome": "Teste de Enlaces Opticos com OTDR", "horas": 16,
+             "requer": ["Certificacao de Enlaces Opticos (Tier 1)"],
+             "missoes": _mis([
+                 ("c8-1", "O OTDR na mao", "lancar e ler a curva do enlace"),
+                 ("c8-2", "Onde quebrou?", "achar a ruptura na curva do OTDR"),
+                 ("c8-3", "Medir e comparar", "comparar a medida com o desenho do projeto"),
+             ])},
+            {"nome": "Orcamento de Perda e Potencia Optica", "horas": 16,
+             "requer": ["Teste de Enlaces Opticos com OTDR"],
+             "missoes": _mis([
+                 ("c9-1", "A conta do enlace", "somar as perdas e ver se cabem no orcamento"),
+                 ("c9-2", "Potencia do laser", "conferir se o transceiver atende a distancia"),
+                 ("c9-3", "Folga de seguranca", "decidir se o projeto passa com margem"),
+             ])},
+            {"nome": "Taxa de Ocupacao de Caminhos", "horas": 16,
+             "requer": ["Orcamento de Perda e Potencia Optica"],
+             "missoes": _mis([
+                 ("c10-1", "Caminho cheio", "calcular a ocupacao dos dutos e caminhos da obra"),
+                 ("c10-2", "Crescer sem obra", "estimar quanto ainda cabe antes de furar parede"),
+             ])},
+            {"nome": "Pratica com Tecnologia em Fibra Optica", "horas": 8,
+             "requer": ["Taxa de Ocupacao de Caminhos"],
+             "missoes": _mis([
+                 ("c11-1", "O desafio da torre", "montar o enlace completo do predio ao topo"),
+                 ("c11-2", "Entregando a obra", "consolidar o relatorio final do projeto"),
+             ])},
         ],
     },
     {
         "tema": "Mikrotik",
+        "fase": "Casa arrumada: chega o roteador de borda que o Sr. Valente comprou.",
         "topicos": [
-            {"nome": "MTCNA (Oficial)", "horas": 24, "missoes": []},
-            {"nome": "MTCRE (Oficial)", "horas": 16, "missoes": []},
-            {"nome": "MTCSE (Oficial)", "horas": 16, "missoes": []},
+            {"nome": "MTCNA (Oficial)", "horas": 24,
+             "requer": ["Protocolo TCP/IP", "Roteamento IP e RIP"],
+             "missoes": _mis([
+                 ("mk1-1", "Primeiro login", "acessar o RouterOS e configurar o basico"),
+                 ("mk1-2", "IP na borda", "enderecar as interfaces do roteador"),
+                 ("mk1-3", "DHCP dos dois lados", "cliente e servidor DHCP no Mikrotik"),
+                 ("mk1-4", "Masquerade", "NAT de saida com o jeitinho RouterOS"),
+                 ("mk1-5", "Firewall do Valente", "regras basicas de protecao da borda"),
+             ])},
+            {"nome": "MTCRE (Oficial)", "horas": 16, "requer": ["MTCNA (Oficial)"],
+             "missoes": _mis([
+                 ("mk2-1", "Rotas estaticas", "rotas manuais no RouterOS"),
+                 ("mk2-2", "OSPF na mao", "protocolo de roteamento dinamico"),
+                 ("mk2-3", "Fallback de link", "dois provedores: se um cair, o outro assume"),
+             ])},
+            {"nome": "MTCSE (Oficial)", "horas": 16, "requer": ["MTCRE (Oficial)"],
+             "missoes": _mis([
+                 ("mk3-1", "VPN site a site", "tunel entre a matriz e a filial"),
+                 ("mk3-2", "Guest isolado", "wifi de visitante separado e seguro"),
+                 ("mk3-3", "Filtro de trafego", "regras avancadas de firewall"),
+             ])},
         ],
     },
     {
         "tema": "Ubiquiti",
+        "fase": "Wi-Fi pra firma inteira, em cima da fibra ja certificada.",
         "topicos": [
-            {"nome": "UFSP (Oficial)", "horas": 6, "missoes": []},
-            {"nome": "UWA (Oficial)", "horas": 16, "missoes": []},
+            {"nome": "UFSP (Oficial)", "horas": 6,
+             "requer": ["Wireless LAN (Redes sem fio)", "Cabeamento Estruturado Fibra"],
+             "missoes": _mis([
+                 ("ub1-1", "Adotar o AP", "colocar o equipamento no controlador UniFi"),
+                 ("ub1-2", "SSID padrao", "configurar a rede sem fio da DC"),
+                 ("ub1-3", "Sites e redes", "organizar os ambientes no painel"),
+             ])},
+            {"nome": "UWA (Oficial)", "horas": 16, "requer": ["UFSP (Oficial)"],
+             "missoes": _mis([
+                 ("ub2-1", "O sinal nao alcanca", "canais, potencia e interferencia no mundo RF"),
+                 ("ub2-2", "Roaming sem dor", "cliente andando pela empresa muda de AP sem cair"),
+                 ("ub2-3", "Projeto RF", "desenhar a cobertura de um andar inteiro"),
+                 ("ub2-4", "Ache o cliente", "localizar o dispositivo no mapa"),
+             ])},
         ],
     },
     {
         "tema": "Huawei",
+        "fase": "O contrato grande exige padrao enterprise: a DC Corp vira provedora.",
         "topicos": [
-            {"nome": "Curso Huawei Oficial", "horas": 16, "missoes": []},
+            {"nome": "Curso Huawei Oficial", "horas": 16,
+             "requer": ["MTCNA (Oficial)", "UWA (Oficial)"],
+             "missoes": _mis([
+                 ("hw1-1", "VLAN no Huawei", "criar VLANs e trunks no VRP"),
+                 ("hw1-2", "Roteamento e NAT no Huawei", "levar o que voce ja sabe para o padrao enterprise"),
+                 ("hw1-3", "Diagnostico VRP", "achar e corrigir problema no equipamento Huawei"),
+             ])},
         ],
     },
     {
         "tema": "Zabbix",
+        "fase": "Tudo no ar: agora ninguem dorme. Monitoramento 24h.",
         "topicos": [
-            {"nome": "Zabbix do Zero", "horas": 16, "missoes": []},
+            {"nome": "Zabbix do Zero", "horas": 16,
+             "requer": ["Network Troubleshooting", "Protocolos e Servicos de Rede"],
+             "missoes": _mis([
+                 ("zb1-1", "Primeiro host", "adicionar o primeiro equipamento da DC no Zabbix"),
+                 ("zb1-2", "Trigger de alerta", "criar alerta de CPU e interface"),
+                 ("zb1-3", "Painel do Valente", "dashboard mostrando os andares em tempo real"),
+                 ("zb1-4", "Auto-discovery", "varredura que acha os hosts sozinha"),
+             ])},
         ],
     },
     {
         "tema": "DataCenter",
+        "fase": "O desfecho: consolidar a DC Corp num data center de verdade.",
         "topicos": [
-            {"nome": "Fundamentos em DataCenter", "horas": 16, "missoes": []},
+            {"nome": "Fundamentos em DataCenter", "horas": 16,
+             "requer": ["Zabbix do Zero", "Cabeamento Profissional"],
+             "missoes": _mis([
+                 ("dc1-1", "Climatizando a sala", "resfriamento, energia e cabos do DC na mao"),
+                 ("dc1-2", "Rede do DC", "topologia simples do data center (spine e leaf)"),
+                 ("dc1-3", "O dia da migracao", "mover a DC Corp inteira para o DC novo"),
+             ])},
+        ],
+    },
+    {
+        "tema": "Programacao",
+        "fase": "Python: o estagiario ensina a infra a se configurar sozinha.",
+        "topicos": [
+            {"nome": "Python do Zero", "horas": 24, "requer": ["Modelo OSI"],
+             "missoes": _mis([
+                 ("pr1-1", "Primeiro script", "print, variaveis e o primeiro codigo do estagiario"),
+                 ("pr1-2", "Decisoes e lacos", "if e for varrendo a lista de IPs da DC"),
+                 ("pr1-3", "Funcoes do dia a dia", "funcoes que checam conectividade de um equipamento"),
+             ])},
+            {"nome": "Automacao de Rede", "horas": 16,
+             "requer": ["Python do Zero", "Switches Ethernet - Parte II"],
+             "missoes": _mis([
+                 ("pr2-1", "Gerador de VLANs", "script que gera as configs das VLANs sozinho"),
+                 ("pr2-2", "Backup das configs", "salvar o running-config de todos os equipamentos"),
+                 ("pr2-3", "Varredura da rede", "descobrir o que esta vivo na rede da DC"),
+             ])},
+            {"nome": "Netmiko e Ansible", "horas": 16,
+             "requer": ["Automacao de Rede", "Roteamento IP e RIP"],
+             "missoes": _mis([
+                 ("pr3-1", "Subindo config via Netmiko", "empurrar a config automatica para o switch"),
+                 ("pr3-2", "Playbook raiz", "Ansible rodando a configuracao das VLANs"),
+                 ("pr3-3", "A infra que se configura sozinha", "o grande gol da automacao na DC Corp"),
+             ])},
         ],
     },
 ]
 
 
+def missao_badge(jogo, mid):
+    if mid in jogo.missoes:
+        return cr("CONCLUIDA ", "green")
+    m = MISSOES.get(mid)
+    if m is not None and status_missao(jogo, mid) == 1:
+        return cr("JOGAVEL   ", "cyan")
+    return cr("EM BREVE  ", "yellow")
+
+
 def estado_topico(jogo, top):
-    vinc = top.get("missoes", [])
-    if not vinc:
-        return "breve", cr(" EM BREVE  ", "dim")
-    if all(v in jogo.missoes for v in vinc):
+    feito = sum(1 for m in top["missoes"] if m["id"] in jogo.missoes)
+    total = len(top["missoes"])
+    if feito == total > 0:
         return "concluido", cr("CONCLUIDO ", "green")
-    return "proximo", cr("JOGAVEL   ", "cyan")
+    if any(m["id"] in MISSOES for m in top["missoes"]):
+        return "proximo", cr("JOGAVEL   ", "cyan")
+    return "breve", cr("EM BREVE  ", "yellow")
+
+
+def topico_liberado(jogo, top):
+    for req in top.get("requer", []):
+        tr = achar_topico(req)
+        if tr is None:
+            continue
+        if not all(m["id"] in jogo.missoes for m in tr["missoes"]):
+            return False, req
+    return True, None
+
+
+def achar_topico(nome):
+    for trilha in TRILHA:
+        for top in trilha["topicos"]:
+            if top["nome"] == nome:
+                return top
+    return None
 
 
 def texto_trilha(jogo):
-    linhas = [cr("== JORNADA DE APRENDIZADO (Acervo Master TI) ==", "bold")]
-    linhas.append(cr("Cada topico do acervo vira missoes no jogo, tema a tema.", "dim"))
-    linhas.append("")
+    linhas = [cr("== JORNADA DE APRENDIZADO (Acervo Master TI) ==", "bold"),
+              cr("Uma trilha destrava a outra: a DC Corp cresce na ordem dos mundos.", "dim"),
+              ""]
     geral = {"jogaveis": 0, "concluidos": 0, "total": 0}
-    for trilha in TRILHA:
-        linhas.append(cr(f"[ {trilha['tema'].upper()} ]", "cyan"))
-        horas_tema = sum(t["horas"] for t in trilha["topicos"])
-        for i, top in enumerate(trilha["topicos"], 1):
+    for trifase in TRILHA:
+        linhas.append(cr(f"[ {trifase['tema'].upper()} ]", "cyan"))
+        linhas.append(cr(f"  Fase: {trifase['fase']}", "dim"))
+        horas_tema = sum(t["horas"] for t in trifase["topicos"])
+        for top in trifase["topicos"]:
             estado, badge = estado_topico(jogo, top)
             geral["total"] += 1
             if estado == "concluido":
                 geral["concluidos"] += 1
-            if estado == "proximo":
+            elif estado == "proximo":
                 geral["jogaveis"] += 1
-            linhas.append(f"  {i:>2}. {top['nome']:<50} {badge} ({top['horas']}h)")
-        linhas.append(cr(f"     total: {horas_tema}h  |  xp de meta: {horas_tema * 100}", "dim"))
+            liberado, falta = topico_liberado(jogo, top)
+            travado = "" if liberado or estado == "proximo" else cr(f"  (primeiro: {falta})", "red")
+            linhas.append("")
+            linhas.append(cr(f"  > {top['nome']} ({top['horas']}h)", "bold") + " " + badge + travado)
+            for mi in top["missoes"]:
+                linhas.append(f"      {mi['titulo']:<45} {missao_badge(jogo, mi['id'])}")
+        linhas.append(cr(f"  total: {horas_tema}h  |  xp de meta: {horas_tema * 100}", "dim"))
         linhas.append("")
-    linhas.append(cr("JORNADA:" + f" {geral['concluidos']}/{geral['total']} topicos concluidos"
-                                     f"  |  {geral['jogaveis']} jogaveis (proximas missoes)", "yellow"))
-    linhas.append(cr("(topicos EM BREVE ganham gameplay nas proximas atualizacoes)", "dim"))
+    linhas.append(cr("RESUMO:" + f" {geral['concluidos']}/{geral['total']} topicos concluidos"
+                                   f"  |  {geral['jogaveis']} desses tem missao jogavel hoje", "yellow"))
+    linhas.append(cr("(JOGAVEL = tem terminal funcionando | EM BREVE = ja esta no roadmap do jogo)", "dim"))
     return "\n".join(linhas)
 
 
