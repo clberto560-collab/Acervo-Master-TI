@@ -53,7 +53,7 @@ Uma passada visual por cima do mesmo jogo:
 | 5 | Trunk ou Access Trocado (JOGAVEL) | 5 | Porta access vs trunk, diagnosticar layer 2 |
 | 6 | A VLAN Fantasma (JOGAVEL) | 6 | Allowed vlan, VLAN nativa, remover VLAN fantasma |
 | 7 | Primeiro Script (Python) (JOGAVEL) | 5 | Python do zero: print, variaveis, texto e numero |
-| 8 | A Infra que se Configura Sozinha | 8 | Python+Netmiko, Ansible |
+| 8 | Decisoes e Lacos (Python) (JOGAVEL) | 6 | Listas, laco FOR, decisao IF (achar o maior) |
 | 9 | O Defensor Final | 9 | Defesa completa (red team simulado) |
 
 > A **progressao do jogo espelha o roadmap de estudo do acervo** — cada missao jogavel e um modulo concluido no mundo real e uma gameplay nova no jogo.
@@ -106,13 +106,15 @@ Terminal Cisco simulado com comandos reais (engine generica, reutilizavel nas pr
 - `help` / `dica` / `missao` / `progresso` / `detonado`
 - `ping 8.8.8.8` (prova da missao 3: diagnostica LAN -> rota -> NAT)
 
-**Capitulo 7 abre o terminal Python (>>>)** — o estagiario comeca a automatizar. Interpretador didatico (seguro, sem exec de codigo arbitrario) que por enquanto ensina a base:
+**Capitulos 7 e 8 abrem o terminal Python (>>>)** — o estagiario comeca a automatizar. Interpretador didatico (seguro, sem exec de codigo arbitrario) com parser proprio de precedencia; cada aula libera o que ensina:
 
 - `print("texto")` — mostra algo na tela (texto entre aspas)
 - `variavel = valor` — guarda um valor: `empresa = "DC Corp"` (texto) ou `andar = 15` (numero)
-- `print(empresa)` — imprime o valor guardado
-- `# comentario` — nao faz nada
-- `progresso` mostra as metas da aula (print de boas-vindas, variavel empresa, imprimir a empresa, andar 15)
+- `lista = [3, 1, 2]` — guarda varios valores
+- `for h in hosts:` — repete pra cada item (bloco com 4 espacos; Enter em branco fecha)
+- `if h > maior:` — decide (bloco); `maior = h` troca o valor
+- Funcoes da aula: `str()`, `int()`, `len()`, `range()`, `max()`, `sorted()`
+- `progresso` mostra as metas da aula (cap. 7: print, empresa, andar 15 | cap. 8: achar o maior da lista, 3)
 - `simular trafego` (prova das missoes 4, 5 e 6: testa ACL / access x trunk / trunk e fantasma)
 
 **Capitulo 1** (O Primeiro Dia): recriar a VLAN 10 (TI) nos dois switches e salvar.

@@ -398,19 +398,33 @@ MISSOES = {
     "m8": {
         "id": "m8",
         "capitulo": 8,
-        "titulo": "A Infra que se Configura Sozinha",
-        "estado": 2,
-        "lv": 8,
+        "titulo": "Decisoes e Lacos (Python)",
+        "estado": 1,
+        "lv": 6,
         "npc": "Supervisora Janaina Lopes",
-        "ambientacao": "O Valente quer cortar custo manual. Ele descobriu a palavra 'automacao'.",
-        "objetivo": "Automatizar configuracao e backup dos equipamentos com Python/Ansible.",
-        "aprender": "Python + Netmiko (SSH em lote), Ansible e infra como codigo.",
+        "ambientacao": "Janaina vira a tela de novo. O script da aula passada ela aprovou no painel: 'agora o script precisa repetir e decidir'.",
+        "objetivo": "No terminal Python (>>>), achar o maior numero de uma lista: criar a lista hosts = [3, 1, 2], um contador maior = 0, varrer com FOR e decidir com IF. Imprimir o maior (dica: termina 3).",
+        "aprender": "Listas, o laco FOR, a decisao IF, achando o maior de uma lista.",
         "recompensa": 1800,
+        "cena_intro": [
+            'JANAINA: "Script bom nao serve so pra print. Ele TEM que repetir',
+            '  e TEM que decidir. Sao as duas superpoderes da programacao."',
+            '"(Dois lembretec novos no monitor:',
+            '  LISTA guarda varios valores:  hosts = [3, 1, 2]',
+            '  FOR visita cada um. IF decide.)"',
+            'Ela aponta pro objetivo: "Tarefa classica, cai em toda entrevista:',
+            '  achar o MAIOR numero da lista. Comeca zerado e vai trocando',
+            '  quando achar um maior. Vai, resolve pra mim."',
+        ],
         "guia": [
-            "1) Conectar via SSH em varios dispositivos com script.",
-            "2) Automatizar backup de configuracao.",
-            "3) Criar playbook que aplica config em N servidores.",
-            "4) Deixar a DC Corp a prova de apagao.",
+            "1) Crie a lista:  hosts = [3, 1, 2]",
+            "2) Crie o contador:  maior = 0",
+            "3) Abra o laco:  for h in hosts:",
+            "4) PRECISA de 4 espacos dentro. Decida:  if h > maior:",
+            "5) Troque quando achar maior:  maior = h",
+            "6) Sai do laco (tira os espacos) e mostre:  print(maior)",
+            "7) Terminou o bloco? Enter em branco fecha o if/for.",
+            "8) progresso e o jogo salva sozinho. (comandos: help, dica, missao)",
         ],
     },
     "m9": {
@@ -750,7 +764,7 @@ TRILHA = [
             {"nome": "Python do Zero", "horas": 24, "requer": ["Modelo OSI"],
              "missoes": _mis([
                  ("m7", "Primeiro script", "print, variaveis e o primeiro codigo do estagiario"),
-                 ("pr1-2", "Decisoes e lacos", "if e for varrendo a lista de IPs da DC"),
+                 ("m8", "Decisoes e lacos", "lista, for e if: o mais classico dos exercicios"),
                  ("pr1-3", "Funcoes do dia a dia", "funcoes que checam conectividade de um equipamento"),
              ])},
             {"nome": "Automacao de Rede", "horas": 16,
@@ -1005,10 +1019,16 @@ class TerminalGame:
         self.jogo = jogo
         self.mid = mid
         self.missao = m
-        self.tipo_python = mid == "m7"
+        self.tipo_python = mid == "m7" or mid == "m8"
         self.pv = {}
         self.py_saidas = []
         self.py_print_count = 0
+        self._py_uso_for = 0
+        self._py_uso_if = 0
+        self._py_loop_it = 0
+        self._py_passos = 0
+        self._py_erro_passos = False
+        self._py_blocos = 0
         if self.tipo_python:
             self.devices = {}
             self.atual = None
@@ -1092,15 +1112,22 @@ class TerminalGame:
         linhas = [cr(f"== PROGRESSO DA MISSAO (capitulo {self.missao['capitulo']}) ==", "bold")]
         if self.tipo_python:
             self._py_metas()
-            for meta, texto in [
-                ("g_print", "rodou um print de boas-vindas"),
-                ("g_empresa", "variavel empresa = 'DC Corp'"),
-                ("g_emp_out", "imprimiu a empresa (saiu 'DC Corp' na tela)"),
-                ("g_andar", "variavel andar = 15 e imprimiu"),
-            ]:
+            metas = (
+                [("g_print", "rodou um print de boas-vindas"),
+                 ("g_empresa", "variavel empresa = 'DC Corp'"),
+                 ("g_emp_out", "imprimiu a empresa (saiu 'DC Corp' na tela)"),
+                 ("g_andar", "variavel andar = 15 e imprimiu")]
+                if self.mid == "m7" else
+                [("g_lista", "lista criada: hosts = [3, 1, 2]"),
+                 ("g_maior0", "contador criado: maior = 0"),
+                 ("g_loop", "laco FOR rodou (for h in hosts:)"),
+                 ("g_if", "decisao IF usada (if h > maior:)"),
+                 ("g_maior", "maior = 3 e imprimiu (print(maior))")]
+            )
+            for meta, texto in metas:
                 marca = cr("OK", "green") if self.pv.get(meta) else cr("FALTA", "yellow")
                 linhas.append(f"  {marca}  {texto}")
-            linhas.append(cr("  Dica: texto entre aspas; numero sem aspas. print(...) mostra na tela.", "dim"))
+            linhas.append(cr("  Dica: dentro do for/if usa 4 espacos; Enter em branco fecha o bloco.", "dim"))
             linhas.append("  -> " + (cr("TODAS AS METAS CUMPRIDAS", "green") if self._python_ok()
                                      else cr("ainda nao concluiu", "yellow")))
             return "\n".join(linhas)
@@ -1190,14 +1217,26 @@ class TerminalGame:
     def dica(self):
         if self.tipo_python:
             self._py_metas()
-            if not self.pv.get("g_print"):
-                return 'Comece dando as boas-vindas:  print("Bem vindo a DC Corp")'
-            if not self.pv.get("g_empresa"):
-                return 'Crie a variavel:  empresa = "DC Corp"'
-            if not self.pv.get("g_emp_out"):
-                return 'Imprima a variavel:  print("A casa e a ", empresa)'
-            if not self.pv.get("g_andar"):
-                return "Crie e imprima o numero:  andar = 15  e depois  print(andar)"
+            if self.mid == "m7":
+                if not self.pv.get("g_print"):
+                    return 'Comece dando as boas-vindas:  print("Bem vindo a DC Corp")'
+                if not self.pv.get("g_empresa"):
+                    return 'Crie a variavel:  empresa = "DC Corp"'
+                if not self.pv.get("g_emp_out"):
+                    return 'Imprima a variavel:  print("A casa e a ", empresa)'
+                if not self.pv.get("g_andar"):
+                    return "Crie e imprima o numero:  andar = 15  e depois  print(andar)"
+                return "Tudo pronto. Confira com:  progresso"
+            if not self.pv.get("g_lista"):
+                return "Crie a lista:  hosts = [3, 1, 2]"
+            if not self.pv.get("g_maior0"):
+                return 'Comece o contador:  maior = 0'
+            if not self.pv.get("g_loop"):
+                return "Abra o laco:  for h in hosts:  (depois Enter em branco fecha)"
+            if not self.pv.get("g_if"):
+                return "Dentro do laco (4 espacos):  if h > maior:  e em baixo  maior = h"
+            if not self.pv.get("g_maior"):
+                return "Depois do laco (sem espacos):  print(maior)"
             return "Tudo pronto. Confira com:  progresso"
         d = self.atual
         if d["modo"] == "user":
@@ -1276,7 +1315,11 @@ class TerminalGame:
                 "  variavel = valor          guarda um valor",
                 "  Ex.: empresa = \"DC Corp\"  (texto entre aspas)",
                 "  Ex.: andar = 15            (numero, sem aspas)",
-                "  print(empresa)            imprime o valor guardado",
+                "  lista = [3, 1, 2]         guarda varios valores",
+                "  for h in hosts:           repete pra cada item (bloco!)",
+                "  if h > maior:             decide (bloco!)",
+                "  Bloco = 4 espacos dentro. Enter em branco fecha.",
+                "  Funcoes desta aula: str(), int(), len(), range(), max(), sorted()",
                 "  # comentario              nao faz nada",
                 "  missao / progresso / detonado / dica",
                 "  help / sair",
@@ -1971,7 +2014,7 @@ class TerminalGame:
         else:
             self.comando_errado("% Host desconhecido. Disponiveis: " + ", ".join(self.devices))
 
-    # ---- modo python (camada 1: do zero) ----
+    # ---- modo python (interpreter didatico: print, variavel, lista, for, if) ----
 
     def _py_split_top(self, texto, sep):
         partes, atual, prof, dentro = [], "", 0, None
@@ -1995,51 +2038,267 @@ class TerminalGame:
         partes.append(atual.strip())
         return partes
 
-    def _py_val(self, expr):
-        e = expr.strip()
-        if e == "":
-            return None
-        if e in self.pv:
-            return self.pv[e]
-        if e.startswith(("str(", "int(")) and e.endswith(")"):
-            arg = self._py_val(e[4:-1])
-            if arg is None:
-                return None
-            return str(arg) if e.startswith("str(") else (int(arg) if isinstance(arg, (int, float)) else None)
+    def _py_tokenizar(self, texto):
+        toks = []
+        i, n = 0, len(texto)
+        while i < n:
+            ch = texto[i]
+            if ch in " \t":
+                i += 1
+            elif ch in ("'", '"'):
+                fech = ch
+                i += 1
+                buf = ""
+                while i < n and texto[i] != fech:
+                    buf += texto[i]
+                    i += 1
+                if i >= n:
+                    raise ValueError("string sem fechamento")
+                i += 1
+                toks.append(("STR", buf))
+            elif ch.isdigit():
+                j = i
+                while j < n and texto[j].isdigit():
+                    j += 1
+                toks.append(("NUM", int(texto[i:j])))
+                i = j
+            elif ch.isalpha() or ch == "_":
+                j = i
+                while j < n and (texto[j].isalnum() or texto[j] == "_"):
+                    j += 1
+                pal = texto[i:j]
+                i = j
+                if pal == "and":
+                    toks.append(("AND", pal))
+                elif pal == "or":
+                    toks.append(("OR", pal))
+                elif pal == "not":
+                    toks.append(("NOT", pal))
+                elif pal == "in":
+                    toks.append(("IN", pal))
+                elif pal == "True":
+                    toks.append(("NUM", True))
+                elif pal == "False":
+                    toks.append(("NUM", False))
+                elif pal == "None":
+                    toks.append(("NUM", None))
+                else:
+                    toks.append(("NAME", pal))
+            else:
+                dois = texto[i:i + 2]
+                if dois in ("==", "!=", ">=", "<="):
+                    toks.append(("OP", dois))
+                    i += 2
+                elif ch in "+-*/%<>=,":
+                    toks.append(("OP", ch))
+                    i += 1
+                elif ch in "()[]":
+                    toks.append((ch, ch))
+                    i += 1
+                else:
+                    raise ValueError(f"caractere {ch!r} nao suportado")
+        toks.append(("EOF", ""))
+        return toks
+
+    _BP = {"OR": 1, "AND": 2, "NOT": 3, "IN": 4, "==": 5, "!=": 5, ">=": 5, "<=": 5, ">": 5, "<": 5,
+            "+": 6, "-": 6, "*": 7, "/": 7}
+
+    def _expr_pratt(self, toks, i=0):
+        avanco = [i]
+
+        def peek():
+            return toks[avanco[0]]
+
+        def consume():
+            t = toks[avanco[0]]
+            avanco[0] += 1
+            return t
+
+        def atom():
+            t = peek()
+            if t[0] in ("NUM", "STR"):
+                return consume()[1]
+            if t[0] == "NAME":
+                nome = consume()[1]
+                if peek()[0] == "(":
+                    consume()
+                    args = []
+                    if peek()[0] != ")":
+                        r = self._expr_pratt(toks, avanco[0])
+                        avanco[0] = r[1]
+                        args.append(r[0])
+                        while peek()[0] == "OP" and peek()[1] == ",":
+                            consume()
+                            r = self._expr_pratt(toks, avanco[0])
+                            avanco[0] = r[1]
+                            args.append(r[0])
+                    if peek()[0] != ")":
+                        raise ValueError("faltou )")
+                    consume()
+                    if nome not in ("str", "int", "len", "range", "sorted", "max"):
+                        raise ValueError(f"funcao {nome} nao esta nesta aula")
+                    if nome == "range":
+                        if len(args) not in (1, 2, 3) or not all(isinstance(a, int) and not isinstance(a, bool) for a in args):
+                            raise ValueError("range precisa de 1 a 3 numeros")
+                        passo = args[2] if len(args) == 3 else 1
+                        if passo == 0:
+                            raise ValueError("range com passo 0 nao existe")
+                        inicio, fim = (0, args[0]) if len(args) == 1 else (args[0], args[1])
+                        if abs(fim - inicio) > 200:
+                            raise ValueError("range curto nesta aula (max 200 itens)")
+                        return list(range(inicio, fim, passo))
+                    if nome == "len":
+                        if len(args) != 1 or not isinstance(args[0], (list, str)):
+                            raise ValueError("len precisa de 1 lista ou 1 texto")
+                        return len(args[0])
+                    if nome == "max":
+                        v = args[0] if len(args) == 1 else args
+                        if isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v):
+                            return max(v)
+                        raise ValueError("max precisa de lista de numeros")
+                    if nome == "sorted":
+                        v = args[0] if len(args) == 1 else args
+                        if isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v):
+                            return sorted(v)
+                        raise ValueError("sorted precisa de lista de numeros")
+                    if nome == "str":
+                        return str(args[0])
+                    if nome == "int":
+                        if len(args) != 1:
+                            raise ValueError("int precisa de 1 argumento")
+                        if isinstance(args[0], bool):
+                            raise ValueError("int nao aceita True/False")
+                        if isinstance(args[0], (int, float)):
+                            return int(args[0])
+                        if isinstance(args[0], str) and args[0].lstrip("-").isdigit():
+                            return int(args[0])
+                        raise ValueError("int precisa de numero ou texto de numero")
+                if nome not in self.pv:
+                    raise ValueError(f"variavel {nome} nao definida")
+                return self.pv[nome]
+            if t[0] == "(":
+                consume()
+                r = self._expr_pratt(toks, avanco[0])
+                avanco[0] = r[1]
+                if peek()[0] != ")":
+                    raise ValueError("faltou )")
+                consume()
+                return r[0]
+            if t[0] == "[":
+                consume()
+                itens = []
+                if peek()[0] != "]":
+                    r = self._expr_pratt(toks, avanco[0])
+                    avanco[0] = r[1]
+                    itens.append(r[0])
+                    while peek()[0] == "OP" and peek()[1] == ",":
+                        consume()
+                        r = self._expr_pratt(toks, avanco[0])
+                        avanco[0] = r[1]
+                        itens.append(r[0])
+                if peek()[0] != "]":
+                    raise ValueError("faltou ]")
+                consume()
+                return itens
+            if t[0] == "OP" and t[1] == "-":
+                consume()
+                v = self._expr_pratt(toks, avanco[0])
+                avanco[0] = v[1]
+                return -v[0]
+            if t[0] == "OP" and t[1] == "+":
+                consume()
+                return self._expr_pratt(toks, avanco[0])
+            raise ValueError("expressao inesperada")
+
+        def nybble(prefix=False):
+            if prefix and peek()[0] == "NOT":
+                consume()
+                v = self._expr_pratt(toks, avanco[0])
+                avanco[0] = v[1]
+                return not v[0]
+            return atom()
+
+        def expr(min_bp=0):
+            left = nybble(True)
+            while True:
+                t = peek()
+                if t[0] == "OP":
+                    bp = self._BP.get(t[1])
+                    if bp is None or bp < min_bp:
+                        break
+                    if t[1] in ("==", "!=", ">=", "<=", ">", "<", "+", "-", "*", "/", "%"):
+                        op = consume()[1]
+                        r = self._expr_pratt(toks, avanco[0])
+                        avanco[0] = r[1]
+                        b = r[0]
+                        try:
+                            if op == "+":
+                                left = left + b
+                            elif op == "-":
+                                left = left - b
+                            elif op == "*":
+                                left = left * b
+                            elif op == "/":
+                                left = left / b
+                            elif op == "%":
+                                left = left % b
+                            elif op == "==":
+                                left = left == b
+                            elif op == "!=":
+                                left = left != b
+                            elif op == ">=":
+                                left = left >= b
+                            elif op == "<=":
+                                left = left <= b
+                            elif op == ">":
+                                left = left > b
+                            elif op == "<":
+                                left = left < b
+                        except (TypeError, ZeroDivisionError):
+                            raise ValueError("conta invalida")
+                    else:
+                        break
+                elif t[0] in ("OR", "AND", "IN"):
+                    bp = self._BP.get(t[0])
+                    if bp is None or bp < min_bp:
+                        break
+                    if t[0] == "OR":
+                        consume()
+                        r = self._expr_pratt(toks, avanco[0])
+                        avanco[0] = r[1]
+                        left = left or r[0]
+                    elif t[0] == "AND":
+                        consume()
+                        r = self._expr_pratt(toks, avanco[0])
+                        avanco[0] = r[1]
+                        left = left and r[0]
+                    else:
+                        consume()
+                        r = self._expr_pratt(toks, avanco[0])
+                        avanco[0] = r[1]
+                        if not isinstance(r[0], (list, str)):
+                            raise ValueError("in precisa de lista ou texto")
+                        left = left in r[0]
+                else:
+                    break
+            return left
+
+        r = expr()
+        return (r, avanco[0])
+
+    def _py_expr(self, texto):
         try:
-            return ast.literal_eval(e)
-        except Exception:
-            pass
-        partes = self._py_split_top(e, "+")
-        if len(partes) > 1:
-            vals = [self._py_val(p) for p in partes]
-            if any(v is None for v in vals):
-                return None
-            if any(isinstance(v, str) for v in vals):
-                return "".join(str(v) for v in vals)
-            try:
-                return sum(vals)
-            except TypeError:
-                return None
-        return None
+            toks = self._py_tokenizar(texto)
+        except ValueError as exc:
+            raise
+        r = self._expr_pratt(toks)
+        if toks[r[1]][0] != "EOF":
+            raise ValueError("sobra de entrada")
+        return r[0]
 
-    def _py_metas(self):
-        saida_juntas = " ".join(self.py_saidas).lower()
-        self.pv["g_print"] = bool(self.py_print_count)
-        emp = self.pv.get("empresa")
-        self.pv["g_empresa"] = isinstance(emp, str) and emp.lower() == "dc corp"
-        self.pv["g_emp_out"] = self.pv["g_empresa"] and "dc corp" in saida_juntas
-        andar = self.pv.get("andar")
-        self.pv["g_andar"] = andar == 15 and "15" in saida_juntas
-
-    def _python_ok(self):
-        self._py_metas()
-        return bool(self.pv.get("g_print") and self.pv.get("g_empresa")
-                    and self.pv.get("g_emp_out") and self.pv.get("g_andar"))
-
-    def _python_roda(self, linha):
+    def _py_roda_linha(self, linha):
         linha = linha.strip()
-        if not linha or linha.startswith("#"):
+        if not linha or linha.startswith("#") or linha.startswith("//"):
             return ""
         codigo = linha.split(" #", 1)[0].rstrip()
         if codigo.startswith("print"):
@@ -2051,29 +2310,162 @@ class TerminalGame:
                 args = []
             vals = []
             for a in args:
-                v = self._py_val(a)
-                if v is None:
-                    return cr(f"NameError: name {a!r} nao esta definido", "red")
+                try:
+                    v = self._py_expr(a)
+                except ValueError as exc:
+                    return cr(f"NameError: {exc}", "red")
                 vals.append(v)
-            texto = " ".join(str(v) for v in vals)
+            texto = " ".join(str(v) if not isinstance(v, list) else str(v) for v in vals)
             self.py_saidas.append(texto)
             self.py_print_count += 1
             if self.py_print_count == 1:
                 self.jogo.ganha_xp(25, "primeiro print")
             return texto
-        if "=" in codigo:
+        if codigo.startswith("para "):
+            return cr("SyntaxError: em Python e  for  (nao  para)", "red")
+        if "=" in codigo and "==" not in codigo and "!=" not in codigo and "<=" not in codigo and ">=" not in codigo:
             nome, _, expr = codigo.partition("=")
             nome = nome.strip()
             expr = expr.strip()
             if not nome or not nome.isidentifier():
                 return cr("SyntaxError: nome de variavel invalido", "red")
-            v = self._py_val(expr)
-            if v is None:
-                return cr(f"NameError: {expr!r} nao e um valor que ensinamos (nesta aula)", "red")
+            try:
+                v = self._py_expr(expr)
+            except ValueError as exc:
+                return cr(f"NameError: {exc}", "red")
             self.pv[nome] = v
             self.jogo.ganha_xp(10, f"variavel {nome} criada")
             return cr(f"{nome} = {v!r}", "dim")
-        return cr('SyntaxError: so ensinamos nesta aula: print(...) e  variavel = valor', "red")
+        if codigo.endswith(":"):
+            return cr("SyntaxError: faltou conteudo dentro do bloco (continue com 4 espacos)", "red")
+        return cr('SyntaxError: nesta aula: print(...), variavel = valor, lista [ ], for e if', "red")
+
+    def _py_exec_bloco(self, linhas, nivel=0):
+        i = 0
+        while i < len(linhas):
+            raw = linhas[i]
+            if not raw.strip():
+                i += 1
+                continue
+            if raw.lstrip().startswith("#"):
+                i += 1
+                continue
+            qtd = len(raw) - len(raw.lstrip(" "))
+            if qtd < nivel:
+                return i
+            cod = raw.strip()
+            self._py_passos += 1
+            if self._py_passos > 2000:
+                self._py_erro_passos = True
+                break
+            if cod.endswith(":"):
+                hdr = cod[:-1].strip()
+                j = i + 1
+                corpo = []
+                while j < len(linhas):
+                    linha_item = linhas[j]
+                    if not linha_item.strip() or linha_item.lstrip().startswith("#"):
+                        corpo.append(linha_item)
+                        j += 1
+                        continue
+                    prof = len(linha_item) - len(linha_item.lstrip(" "))
+                    if prof <= nivel:
+                        break
+                    corpo.append(linha_item)
+                    j += 1
+                if not any(x.strip() for x in corpo):
+                    return cr("SyntaxError: bloco vazio depois de :", "red")
+                resp = self._py_comando_composto(hdr, corpo, nivel)
+                if isinstance(resp, str):
+                    return resp
+                i = j
+            else:
+                resp = self._py_roda_linha(cod)
+                if resp:
+                    print(resp)
+                i += 1
+        return ""
+
+    def _py_comando_composto(self, hdr, corpo, nivel):
+        self._py_blocos += 1
+        if self._py_blocos > 300:
+            self._py_erro_passos = True
+            return cr("travou? demais blocos nesta celula.", "red")
+        if hdr.startswith("for "):
+            resto = hdr[4:].strip()
+            if " in " not in resto:
+                return cr("SyntaxError: for precisa de: for <var> in <lista>:", "red")
+            var, _, seq = resto.partition(" in ")
+            var, seq = var.strip(), seq.strip()
+            if not var or not var.isidentifier():
+                return cr("SyntaxError: nome de variavel invalido no for", "red")
+            try:
+                seqv = self._py_expr(seq)
+            except ValueError as exc:
+                return cr(f"NameError: {exc}", "red")
+            if not isinstance(seqv, (list,)):
+                return cr("TypeError: for com algo que nao e lista", "red")
+            self._py_uso_for += 1
+            self._py_loop_it += len(seqv)
+            for item in seqv:
+                self.pv[var] = item
+                resp = self._py_exec_bloco(corpo, nivel + 1)
+                if isinstance(resp, str):
+                    return resp
+                if self._py_erro_passos:
+                    return cr("que isso? passos demais (cuidado com loop gigante).", "red")
+            return ""
+        if hdr.startswith("if "):
+            cond = hdr[3:].strip()
+            try:
+                valor = self._py_expr(cond)
+            except ValueError as exc:
+                return cr(f"NameError: {exc}", "red")
+            self._py_uso_if += 1
+            if valor:
+                self.jogo.ganha_xp(15, "decisao if usada")
+                resp = self._py_exec_bloco(corpo, nivel + 1)
+                if isinstance(resp, str):
+                    return resp
+            return ""
+        if hdr == "else":
+            return cr('SyntaxError: else fica pra proxima aula. Por enquanto: if e for.', "red")
+        return cr('SyntaxError: so suportamos nesta aula:  for <var> in <lista>:  e  if <condicao>:' , "red")
+
+    def _python_roda(self, linha, blocos=None):
+        self._py_passos = 0
+        self._py_erro_passos = False
+        self._py_blocos = 0
+        if blocos:
+            return self._py_exec_bloco(blocos, 0)
+        return self._py_roda_linha(linha)
+
+    def _py_metas(self):
+        saida_juntas = " ".join(self.py_saidas).lower()
+        if self.mid == "m7":
+            self.pv["g_print"] = bool(self.py_print_count)
+            emp = self.pv.get("empresa")
+            self.pv["g_empresa"] = isinstance(emp, str) and emp.lower() == "dc corp"
+            self.pv["g_emp_out"] = self.pv["g_empresa"] and "dc corp" in saida_juntas
+            andar = self.pv.get("andar")
+            self.pv["g_andar"] = andar == 15 and "15" in saida_juntas
+        elif self.mid == "m8":
+            hosts = self.pv.get("hosts")
+            self.pv["g_lista"] = hosts == [3, 1, 2]
+            self.pv["g_maior0"] = isinstance(self.pv.get("maior"), int) and not isinstance(self.pv.get("maior"), bool)
+            self.pv["g_loop"] = bool(getattr(self, "_py_uso_for", 0))
+            self.pv["g_if"] = bool(getattr(self, "_py_uso_if", 0))
+            self.pv["g_maior"] = self.pv.get("maior") == 3 and "3" in saida_juntas
+
+    def _python_ok(self):
+        self._py_metas()
+        if self.mid == "m7":
+            return bool(self.pv.get("g_print") and self.pv.get("g_empresa")
+                        and self.pv.get("g_emp_out") and self.pv.get("g_andar"))
+        if self.mid == "m8":
+            return bool(self.pv.get("g_lista") and self.pv.get("g_maior0") and self.pv.get("g_loop")
+                        and self.pv.get("g_if") and self.pv.get("g_maior"))
+        return False
 
     def _jogar_python(self):
         print()
@@ -2103,7 +2495,23 @@ class TerminalGame:
             elif cmd in ("trilha", "jornada"):
                 print(texto_trilha(self.jogo))
             else:
-                saida = self._python_roda(linha)
+                if linha.rstrip().endswith(":"):
+                    blocos = [linha]
+                    while True:
+                        cont = ler(cr("  ... ", "dim"))
+                        if cont in ("eof",):
+                            break
+                        if not cont.strip():
+                            break
+                        blocos.append(cont)
+                    saida = self._python_roda(linha, blocos)
+                else:
+                    self._py_uso_for = getattr(self, "_py_uso_for", 0)
+                    self._py_uso_if = getattr(self, "_py_uso_if", 0)
+                    self._py_passos = 0
+                    self._py_erro_passos = False
+                    self._py_blocos = 0
+                    saida = self._python_roda(linha)
                 if saida:
                     print(saida)
             if self.venceu():
@@ -2290,6 +2698,11 @@ class TerminalGame:
             print(cr('  Esse par de maos aqui nasceu pra codar, estagiario. Amanha', "magenta"))
             print(cr('  a gente joga esse script no bagulho que liga a rede sozinha."', "magenta"))
             print(cr('  (Ela tira o lembrete do monitor. Ela acha que voce aprendeu.)', "dim"))
+        elif self.mid == "m8":
+            print(cr('Janaina: "LISTA. LACO. DECISAO. Achou o 3 no meio da bagunca', "magenta"))
+            print(cr('  da lista. Repetir e decidir: com isso voce resolve', "magenta"))
+            print(cr('  90% das tarefa de rede. A outra metade e funcao..."', "magenta"))
+            print(cr('  (Ela para. Ajusta o lembrete pro proximo: FUNCOES.)', "dim"))
         print()
         print(cr("Voltando a central de operacoes...", "dim"))
         if self.jogo.salvar():
